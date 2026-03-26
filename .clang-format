@@ -1,0 +1,26 @@
+---
+# Google C++ Style Guide
+BasedOnStyle: Google
+
+# Prefer T* p over T *p (Google uses left-alignment)
+DerivePointerAlignment: false
+PointerAlignment: Left
+
+# Include sorting
+IncludeBlocks: Regroup
+IncludeCategories:
+  # C system headers (angle-bracket, .h extension)
+  - Regex:           '<[a-z_]+\.h>'
+    Priority:        10
+  # C++ standard library headers (angle-bracket, no extension)
+  - Regex:           '<[a-z_/]+>'
+    Priority:        20
+  # Other angle-bracket headers (external libraries)
+  - Regex:           '<.*>'
+    Priority:        30
+  # Quoted headers (project-internal)
+  - Regex:           '".*"'
+    Priority:        40
+
+# Allow longer lines for complex expressions — 100 is a common embedded-friendly limit
+ColumnLimit: 100
