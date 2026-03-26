@@ -41,15 +41,15 @@
 // positive value on success.
 
 #define SYSPROP_OK                    0
-#define SYSPROP_ERR_NOT_FOUND        -1
-#define SYSPROP_ERR_READ_ONLY        -2
-#define SYSPROP_ERR_INVALID_KEY      -3
-#define SYSPROP_ERR_VALUE_TOO_LONG   -4
-#define SYSPROP_ERR_KEY_TOO_LONG     -5
-#define SYSPROP_ERR_IO               -6
-#define SYSPROP_ERR_PERMISSION       -7
-#define SYSPROP_ERR_NOT_INITIALIZED  -8
-#define SYSPROP_ERR_BUFFER_TOO_SMALL -9
+#define SYSPROP_ERR_NOT_FOUND        (-1)
+#define SYSPROP_ERR_READ_ONLY        (-2)
+#define SYSPROP_ERR_INVALID_KEY      (-3)
+#define SYSPROP_ERR_VALUE_TOO_LONG   (-4)
+#define SYSPROP_ERR_KEY_TOO_LONG     (-5)
+#define SYSPROP_ERR_IO               (-6)
+#define SYSPROP_ERR_PERMISSION       (-7)
+#define SYSPROP_ERR_NOT_INITIALIZED  (-8)
+#define SYSPROP_ERR_BUFFER_TOO_SMALL (-9)
 
 // ── Config ────────────────────────────────────────────────────────────────────
 

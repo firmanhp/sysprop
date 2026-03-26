@@ -1,0 +1,58 @@
+---
+# clang-tidy configuration for sysprop.
+# Only our own source files are linted (see HeaderFilterRegex + lint.sh).
+
+Checks: >-
+  -*,
+  bugprone-*,
+  cert-dcl50-cpp,
+  cert-dcl58-cpp,
+  cert-err33-c,
+  cert-err34-c,
+  cert-flp30-c,
+  cert-mem57-cpp,
+  cert-msc50-cpp,
+  cert-msc51-cpp,
+  clang-analyzer-*,
+  cppcoreguidelines-init-variables,
+  cppcoreguidelines-narrowing-conversions,
+  cppcoreguidelines-no-malloc,
+  cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+  cppcoreguidelines-pro-bounds-constant-array-index,
+  cppcoreguidelines-pro-type-cstyle-cast,
+  cppcoreguidelines-pro-type-reinterpret-cast,
+  cppcoreguidelines-pro-type-vararg,
+  cppcoreguidelines-slicing,
+  misc-misplaced-const,
+  misc-redundant-expression,
+  misc-unused-parameters,
+  misc-unused-using-decls,
+  modernize-use-nullptr,
+  modernize-use-override,
+  performance-for-range-copy,
+  performance-implicit-conversion-in-loop,
+  performance-inefficient-string-concatenation,
+  performance-move-const-arg,
+  performance-unnecessary-copy-initialization,
+  portability-*,
+  readability-braces-around-statements,
+  readability-const-return-type,
+  readability-container-size-empty,
+  readability-delete-null-pointer,
+  readability-misplaced-array-index,
+  readability-non-const-parameter,
+  readability-redundant-control-flow,
+  readability-redundant-preprocessor,
+  readability-simplify-boolean-expr,
+  readability-string-compare,
+  readability-suspicious-call-argument
+
+# Treat warnings as errors in CI — remove WarningsAsErrors to allow
+# advisory-only runs during development.
+WarningsAsErrors: ''
+
+HeaderFilterRegex: '.*/sysprop/(src|include)/.*'
+
+CheckOptions:
+  - key: bugprone-easily-swappable-parameters.MinimumLength
+    value: '3'

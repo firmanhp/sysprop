@@ -5,7 +5,7 @@
 #include <string>
 
 #include <benchmark/benchmark.h>
-#include <sys/stat.h>
+#include <gtest/gtest.h>
 #include <sysprop/sysprop.h>
 
 #include "file_backend.h"
@@ -19,16 +19,10 @@ using sysprop::internal::PropertyStore;
 // ── Fixture helpers ───────────────────────────────────────────────────────────
 
 std::string MakeTmpDir() {
-  char tmpl[] = "/tmp/sysprop_bench_XXXXXX";
-  const char* d = ::mkdtemp(tmpl);
+  std::string tmpl = testing::TempDir() + "sysprop_bench_XXXXXX";
+  const char* d = ::mkdtemp(tmpl.data());
   if (d == nullptr) std::abort();
   return d;
-}
-
-void RemoveTmpDir(const std::string& dir) {
-  // system() is intentional here: benchmarks run in a controlled environment
-  // and we want a simple, reliable recursive delete.
-  (void)::system(("rm -rf " + dir).c_str());
 }
 
 // Pre-populate a store with n properties named "bench.key.000000", etc.
@@ -44,7 +38,7 @@ void Populate(PropertyStore& store, int n) {
 
 void BM_Get(benchmark::State& state) {
   const auto dir = MakeTmpDir();
-  FileBackend backend{dir};
+  FileBackend backend{dir.c_str()};
   PropertyStore store{&backend, nullptr};
   (void)store.Set("bench.target", "hello_world");
 
@@ -53,13 +47,13 @@ void BM_Get(benchmark::State& state) {
     benchmark::DoNotOptimize(store.Get("bench.target", buf, sizeof(buf)));
   }
   state.SetItemsProcessed(state.iterations());
-  RemoveTmpDir(dir);
+
 }
 BENCHMARK(BM_Get);
 
 void BM_GetMissing(benchmark::State& state) {
   const auto dir = MakeTmpDir();
-  FileBackend backend{dir};
+  FileBackend backend{dir.c_str()};
   PropertyStore store{&backend, nullptr};
 
   char buf[SYSPROP_MAX_VALUE_LENGTH];
@@ -67,26 +61,26 @@ void BM_GetMissing(benchmark::State& state) {
     benchmark::DoNotOptimize(store.Get("no.such.key", buf, sizeof(buf)));
   }
   state.SetItemsProcessed(state.iterations());
-  RemoveTmpDir(dir);
+
 }
 BENCHMARK(BM_GetMissing);
 
 void BM_Set(benchmark::State& state) {
   const auto dir = MakeTmpDir();
-  FileBackend backend{dir};
+  FileBackend backend{dir.c_str()};
   PropertyStore store{&backend, nullptr};
 
   for (auto _ : state) {
     benchmark::DoNotOptimize(store.Set("bench.write.key", "benchmark_value"));
   }
   state.SetItemsProcessed(state.iterations());
-  RemoveTmpDir(dir);
+
 }
 BENCHMARK(BM_Set);
 
 void BM_List(benchmark::State& state) {
   const auto dir = MakeTmpDir();
-  FileBackend backend{dir};
+  FileBackend backend{dir.c_str()};
   PropertyStore store{&backend, nullptr};
   Populate(store, static_cast<int>(state.range(0)));
 
@@ -101,7 +95,7 @@ void BM_List(benchmark::State& state) {
     benchmark::DoNotOptimize(count);
   }
   state.SetItemsProcessed(state.iterations() * state.range(0));
-  RemoveTmpDir(dir);
+
 }
 BENCHMARK(BM_List)->Arg(10)->Arg(100)->Arg(1000);
 
@@ -114,7 +108,7 @@ void BM_ConcurrentReads(benchmark::State& state) {
 
   if (state.thread_index() == 0) {
     shared_dir = MakeTmpDir();
-    shared_backend = std::make_unique<FileBackend>(shared_dir);
+    shared_backend = std::make_unique<FileBackend>(shared_dir.c_str());
     shared_store = std::make_unique<PropertyStore>(shared_backend.get(), nullptr);
     (void)shared_store->Set("shared.read.key", "shared_value");
   }
@@ -128,7 +122,6 @@ void BM_ConcurrentReads(benchmark::State& state) {
   if (state.thread_index() == 0) {
     shared_store.reset();
     shared_backend.reset();
-    RemoveTmpDir(shared_dir);
   }
 }
 BENCHMARK(BM_ConcurrentReads)->Threads(1)->Threads(2)->Threads(4)->Threads(8);

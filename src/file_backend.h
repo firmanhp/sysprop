@@ -1,8 +1,6 @@
 #pragma once
 
-#include <string>
-
-#include "backend.h"
+#include <cstddef>
 
 namespace sysprop::internal {
 
@@ -25,24 +23,49 @@ namespace sysprop::internal {
 //   All public methods are safe to call concurrently. Multiple simultaneous
 //   reads are always safe. Concurrent writes to different keys are safe.
 //   Concurrent writes to the same key are safe (last rename wins).
-class FileBackend final : public Backend {
+class FileBackend final {
  public:
-  // base_path must be an existing directory.
-  explicit FileBackend(std::string base_path);
-  ~FileBackend() override = default;
+  // base_path must point to an existing directory. The string is copied
+  // internally; the caller's buffer need not outlive this constructor call.
+  explicit FileBackend(const char* base_path);
+  ~FileBackend() = default;
 
-  [[nodiscard]] int Get(const char* key, char* buf, std::size_t buf_len) override;
-  [[nodiscard]] int Set(const char* key, const char* value) override;
-  [[nodiscard]] int Delete(const char* key) override;
-  [[nodiscard]] int Exists(const char* key) override;
-  [[nodiscard]] int ForEach(Visitor visitor) override;
+  [[nodiscard]] int Get(const char* key, char* buf, std::size_t buf_len);
+  [[nodiscard]] int Set(const char* key, const char* value);
+  [[nodiscard]] int Delete(const char* key);
+  [[nodiscard]] int Exists(const char* key);
+
+  // Non-owning, non-allocating visitor passed to ForEach.
+  // fn must not be null. The callable and its context must outlive the Visitor.
+  struct Visitor {
+    bool (*fn)(void* ctx, const char* key, const char* value);
+    void* ctx;
+    bool operator()(const char* key, const char* value) const {
+      return fn(ctx, key, value);
+    }
+  };
+
+  // Iterate over all stored properties. The visitor is called once per entry
+  // with null-terminated key and value strings. Iteration stops early if
+  // visitor returns false.
+  [[nodiscard]] int ForEach(Visitor visitor);
 
  private:
   // Writes the full path for key into dst. Returns false if the result would
   // exceed dst_len.
   [[nodiscard]] bool BuildPath(char* dst, std::size_t dst_len, const char* key) const noexcept;
 
-  std::string base_path_;
+  static constexpr std::size_t kMaxBasePathSize = 4096;
+  char base_path_[kMaxBasePathSize];
 };
+
+// Create a Visitor from any callable (lambda, functor). The callable is held
+// by pointer — it must outlive the returned Visitor.
+template<typename F>
+FileBackend::Visitor MakeVisitor(F& f) {
+  return {[](void* ctx, const char* k, const char* v) -> bool {
+    return (*static_cast<F*>(ctx))(k, v);
+  }, &f};
+}
 
 }  // namespace sysprop::internal

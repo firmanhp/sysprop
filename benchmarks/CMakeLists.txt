@@ -5,6 +5,7 @@ target_link_libraries(sysprop_benchmark
         sysprop
         sysprop_build_flags
         benchmark::benchmark_main
+        GTest::gtest
 )
 
 target_include_directories(sysprop_benchmark

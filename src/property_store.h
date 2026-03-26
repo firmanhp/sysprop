@@ -2,7 +2,7 @@
 
 #include <cstddef>
 
-#include "backend.h"
+#include "file_backend.h"
 
 namespace sysprop::internal {
 
@@ -20,7 +20,7 @@ class PropertyStore {
  public:
   // runtime_backend is required. persistent_backend may be null (disables
   // persistence). Both pointers must outlive this object.
-  PropertyStore(Backend* runtime_backend, Backend* persistent_backend);
+  PropertyStore(FileBackend* runtime_backend, FileBackend* persistent_backend);
 
   [[nodiscard]] int Get(const char* key, char* buf, std::size_t buf_len);
   [[nodiscard]] int Set(const char* key, const char* value);
@@ -28,7 +28,12 @@ class PropertyStore {
   [[nodiscard]] int Exists(const char* key);
 
   // Iterate over all runtime properties.
-  [[nodiscard]] int ForEach(Backend::Visitor visitor);
+  // Accepts any callable: ForEach([&](const char* key, const char* value) { ... });
+  template<typename F>
+  [[nodiscard]] int ForEach(F f) {
+    auto v = MakeVisitor(f);
+    return ForEachImpl(v);
+  }
 
   // Load persisted properties from persistent_backend into runtime_backend.
   // No-op if persistent_backend is null. Returns the number of loaded
@@ -36,8 +41,11 @@ class PropertyStore {
   [[nodiscard]] int LoadPersistentProperties();
 
  private:
-  Backend* runtime_;
-  Backend* persistent_;  // may be null
+  [[nodiscard]] int ForEachImpl(FileBackend::Visitor visitor);
+  [[nodiscard]] int SetRuntimeOnly(const char* key, const char* value);
+
+  FileBackend* runtime_;
+  FileBackend* persistent_;  // may be null
 };
 
 }  // namespace sysprop::internal

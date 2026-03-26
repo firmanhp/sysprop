@@ -9,15 +9,15 @@
 //   SYSPROP_RUNTIME_DIR    — override the runtime property directory
 //   SYSPROP_PERSISTENT_DIR — override the persistent property directory
 
-#include <algorithm>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
-#include <string>
+#include <memory>
 #include <string_view>
-#include <vector>
 
 #include <sysprop/sysprop.h>
 
+#include "cli_commands.h"
 #include "file_backend.h"
 #include "property_store.h"
 
@@ -26,91 +26,16 @@ namespace {
 using sysprop::internal::FileBackend;
 using sysprop::internal::PropertyStore;
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
 const char* ProgName(const char* argv0) noexcept {
   const char* p = std::strrchr(argv0, '/');
   return p != nullptr ? p + 1 : argv0;
 }
 
-// Build a config from environment overrides, falling back to compiled defaults.
 sysprop_config_t ConfigFromEnv() {
   sysprop_config_t cfg{SYSPROP_RUNTIME_DIR, SYSPROP_PERSISTENT_DIR, 1};
-  if (const char* rd = std::getenv("SYSPROP_RUNTIME_DIR")) cfg.runtime_dir = rd;
-  if (const char* pd = std::getenv("SYSPROP_PERSISTENT_DIR")) cfg.persistent_dir = pd;
+  if (const char* rd = std::getenv("SYSPROP_RUNTIME_DIR")) { cfg.runtime_dir = rd; }
+  if (const char* pd = std::getenv("SYSPROP_PERSISTENT_DIR")) { cfg.persistent_dir = pd; }
   return cfg;
-}
-
-// Print all properties sorted in Android-style "[key]: [value]" format.
-int DoList(PropertyStore& store) {
-  std::vector<std::pair<std::string, std::string>> props;
-  // Discard ForEach's error return: partial listing failure is non-fatal for
-  // an interactive list command.
-  (void)store.ForEach([&](const char* key, const char* value) {
-    props.emplace_back(key, value);
-    return true;
-  });
-
-  std::sort(props.begin(), props.end());
-  for (const auto& [k, v] : props) {
-    std::printf("[%s]: [%s]\n", k.c_str(), v.c_str());
-  }
-  return 0;
-}
-
-// ── Sub-commands ──────────────────────────────────────────────────────────────
-
-int CmdGetprop(int argc, char* argv[], PropertyStore& store) {
-  if (argc == 1) return DoList(store);
-
-  const char* key = argv[1];
-  char buf[SYSPROP_MAX_VALUE_LENGTH];
-  const int n = store.Get(key, buf, sizeof(buf));
-
-  if (n < 0) {
-    if (argc >= 3) {
-      // Optional default value supplied as the second argument.
-      std::puts(argv[2]);
-      return 0;
-    }
-    if (n == SYSPROP_ERR_NOT_FOUND) {
-      // Android-compatible: a missing key prints an empty line.
-      std::puts("");
-      return 0;
-    }
-    std::fprintf(stderr, "getprop: error reading '%s': %s\n", key, sysprop_error_string(n));
-    return 1;
-  }
-
-  std::puts(buf);
-  return 0;
-}
-
-int CmdSetprop(int argc, char* argv[], PropertyStore& store) {
-  if (argc < 3) {
-    std::fprintf(stderr, "Usage: setprop <key> <value>\n");
-    return 1;
-  }
-
-  if (const int rc = store.Set(argv[1], argv[2]); rc != SYSPROP_OK) {
-    std::fprintf(stderr, "setprop: failed to set '%s': %s\n", argv[1], sysprop_error_string(rc));
-    return 1;
-  }
-  return 0;
-}
-
-int CmdDelete(int argc, char* argv[], PropertyStore& store) {
-  if (argc < 2) {
-    std::fprintf(stderr, "Usage: sysprop delete <key>\n");
-    return 1;
-  }
-
-  if (const int rc = store.Delete(argv[1]); rc != SYSPROP_OK) {
-    std::fprintf(stderr, "sysprop delete: failed to delete '%s': %s\n", argv[1],
-                 sysprop_error_string(rc));
-    return 1;
-  }
-  return 0;
 }
 
 void PrintUsage(const char* prog) {
@@ -146,8 +71,8 @@ int main(int argc, char* argv[]) {
 
   const std::string_view name{prog};
 
-  if (name == "getprop") return CmdGetprop(argc, argv, store);
-  if (name == "setprop") return CmdSetprop(argc, argv, store);
+  if (name == "getprop") return sysprop::tools::CmdGetprop(argc, argv, store);
+  if (name == "setprop") return sysprop::tools::CmdSetprop(argc, argv, store);
 
   // Invoked as "sysprop <subcommand> ..."
   if (argc < 2) {
@@ -156,10 +81,10 @@ int main(int argc, char* argv[]) {
   }
 
   const std::string_view cmd{argv[1]};
-  if (cmd == "get") return CmdGetprop(argc - 1, argv + 1, store);
-  if (cmd == "set") return CmdSetprop(argc - 1, argv + 1, store);
-  if (cmd == "delete") return CmdDelete(argc - 1, argv + 1, store);
-  if (cmd == "list") return DoList(store);
+  if (cmd == "get") return sysprop::tools::CmdGetprop(argc - 1, argv + 1, store);
+  if (cmd == "set") return sysprop::tools::CmdSetprop(argc - 1, argv + 1, store);
+  if (cmd == "delete") return sysprop::tools::CmdDelete(argc - 1, argv + 1, store);
+  if (cmd == "list") return sysprop::tools::DoList(store);
 
   std::fprintf(stderr, "sysprop: unknown command '%s'\n", argv[1]);
   PrintUsage(prog);

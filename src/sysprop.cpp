@@ -3,7 +3,8 @@
 #include <cerrno>
 #include <cstdlib>
 #include <cstring>
-#include <memory>
+#include <new>
+#include <optional>
 #include <string_view>
 
 #include "file_backend.h"
@@ -16,34 +17,42 @@ using sysprop::internal::PropertyStore;
 
 // ── Global singleton ──────────────────────────────────────────────────────────
 //
-// System properties are global state by definition (analogous to environment
-// variables). The function-local static is initialized exactly once on first
-// use; C++11 guarantees this is thread-safe without any explicit locking.
+// Constructed once by sysprop_init() into static storage (no heap). Until
+// sysprop_init() is called, s_instance is null and all API calls return
+// SYSPROP_ERR_NOT_INITIALIZED.
 //
-// The first call to get() wins: subsequent calls with a different config are
-// silently ignored, matching the behaviour of the previous call_once approach.
+// Thread safety: sysprop_init() is expected to be called from main() before
+// any threads are started. Concurrent property access after init is safe
+// because FileBackend operations are individually atomic (rename(2)).
 
-class GlobalStore {
- public:
-  static PropertyStore& get(const sysprop_config_t* cfg = nullptr) {
-    static GlobalStore instance{cfg};
-    return instance.store_;
-  }
-
- private:
+struct GlobalStore {
   explicit GlobalStore(const sysprop_config_t* cfg)
       : runtime_{(cfg && cfg->runtime_dir) ? cfg->runtime_dir : SYSPROP_RUNTIME_DIR},
-        persistent_{((cfg == nullptr) || (cfg->enable_persistence != 0))
-                        ? std::make_unique<FileBackend>(
-                              (cfg && cfg->persistent_dir) ? cfg->persistent_dir
-                                                           : SYSPROP_PERSISTENT_DIR)
-                        : nullptr},
-        store_{&runtime_, persistent_.get()} {}
+        persistent_{MakePersistent(cfg)},
+        store_{&runtime_, persistent_ ? &*persistent_ : nullptr} {}
 
-  FileBackend                  runtime_;
-  std::unique_ptr<FileBackend> persistent_;
-  PropertyStore                store_;
+  static std::optional<FileBackend> MakePersistent(const sysprop_config_t* cfg) {
+    if ((cfg == nullptr) || (cfg->enable_persistence != 0)) {
+      return FileBackend{(cfg && cfg->persistent_dir) ? cfg->persistent_dir
+                                                      : SYSPROP_PERSISTENT_DIR};
+    }
+    return std::nullopt;
+  }
+
+  FileBackend                runtime_;
+  std::optional<FileBackend> persistent_;
+  PropertyStore              store_;
 };
+
+// Raw storage avoids any static-initializer or atexit registration.
+// Placement-new'd by sysprop_init(); never explicitly destructed (lifetime
+// matches the process — the OS reclaims on exit).
+alignas(GlobalStore) static unsigned char s_storage[sizeof(GlobalStore)];
+static GlobalStore* s_instance = nullptr;
+
+PropertyStore* GetStore() {
+  return s_instance ? &s_instance->store_ : nullptr;
+}
 
 }  // namespace
 
@@ -68,49 +77,61 @@ const char* sysprop_error_string(int err) {
 }
 
 int sysprop_init(const sysprop_config_t* config) {
-  GlobalStore::get(config);
+  if (s_instance) { return SYSPROP_OK; }  // already initialized; ignore
+  s_instance = new (s_storage) GlobalStore{config}; // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
   return SYSPROP_OK;
 }
 
 int sysprop_get(const char* key, char* buf, size_t buf_len) {
-  return GlobalStore::get().Get(key, buf, buf_len);
+  PropertyStore* s = GetStore();
+  if (!s) { return SYSPROP_ERR_NOT_INITIALIZED; }
+  return s->Get(key, buf, buf_len);
 }
 
 int sysprop_set(const char* key, const char* value) {
-  return GlobalStore::get().Set(key, value);
+  PropertyStore* s = GetStore();
+  if (!s) { return SYSPROP_ERR_NOT_INITIALIZED; }
+  return s->Set(key, value);
 }
 
-int sysprop_delete(const char* key) { return GlobalStore::get().Delete(key); }
+int sysprop_delete(const char* key) {
+  PropertyStore* s = GetStore();
+  if (!s) { return SYSPROP_ERR_NOT_INITIALIZED; }
+  return s->Delete(key);
+}
 
 int sysprop_get_int(const char* key, int default_value) {
   char buf[SYSPROP_MAX_VALUE_LENGTH];
-  if (GlobalStore::get().Get(key, buf, sizeof(buf)) < 0) return default_value;
+  PropertyStore* s = GetStore();
+  if (!s || s->Get(key, buf, sizeof(buf)) < 0) { return default_value; } // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
 
   char* end = nullptr;
   errno = 0;
-  const long val = std::strtol(buf, &end, 10);
-  if (end == buf || errno != 0) return default_value;
+  const long val = std::strtol(buf, &end, 10); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+  if (end == buf || errno != 0) { return default_value; } // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
   return static_cast<int>(val);
 }
 
 int sysprop_get_bool(const char* key, int default_value) {
   char buf[SYSPROP_MAX_VALUE_LENGTH];
-  if (GlobalStore::get().Get(key, buf, sizeof(buf)) < 0) return default_value ? 1 : 0;
+  PropertyStore* s = GetStore();
+  if (!s || s->Get(key, buf, sizeof(buf)) < 0) { return default_value ? 1 : 0; } // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
 
-  const std::string_view sv{buf};
-  if (sv == "1" || sv == "true" || sv == "yes" || sv == "on") return 1;
-  if (sv == "0" || sv == "false" || sv == "no" || sv == "off") return 0;
+  const std::string_view sv{buf}; // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+  if (sv == "1" || sv == "true" || sv == "yes" || sv == "on") { return 1; }
+  if (sv == "0" || sv == "false" || sv == "no" || sv == "off") { return 0; }
   return default_value ? 1 : 0;
 }
 
 float sysprop_get_float(const char* key, float default_value) {
   char buf[SYSPROP_MAX_VALUE_LENGTH];
-  if (GlobalStore::get().Get(key, buf, sizeof(buf)) < 0) return default_value;
+  PropertyStore* s = GetStore();
+  if (!s || s->Get(key, buf, sizeof(buf)) < 0) { return default_value; } // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
 
   char* end = nullptr;
   errno = 0;
-  const float val = std::strtof(buf, &end);
-  if (end == buf || errno != 0) return default_value;
+  const float val = std::strtof(buf, &end); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+  if (end == buf || errno != 0) { return default_value; } // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
   return val;
 }
 

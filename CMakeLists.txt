@@ -23,7 +23,7 @@ set(SYSPROP_MAX_VALUE_LENGTH 256 CACHE STRING "Maximum property value length in 
 # brought in by FetchContent is never linked against it and inherits no flags.
 add_library(sysprop_build_flags INTERFACE)
 target_compile_options(sysprop_build_flags INTERFACE
-    -O3 -Wall -Wextra -Wpedantic -Werror
+    -O3 -Wall -Wextra -Wpedantic -Werror -fno-exceptions
 )
 
 # ── Dependencies ───────────────────────────────────────────────────────────────
