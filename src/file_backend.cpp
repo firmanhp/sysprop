@@ -44,10 +44,13 @@ UniqueFd OpenWriteNew(const char* path) {
 }
 
 // RAII wrapper for a DIR*.
-using UniqueDir = std::unique_ptr<DIR, decltype(&::closedir)>;
+struct CloseDirFn {
+  void operator()(DIR* d) const { ::closedir(d); }
+};
+using UniqueDir = std::unique_ptr<DIR, CloseDirFn>;
 
 UniqueDir OpenDir(const char* path) {
-  return UniqueDir{::opendir(path), ::closedir};
+  return UniqueDir{::opendir(path)};
 }
 
 }  // namespace

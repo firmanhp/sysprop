@@ -218,7 +218,8 @@ TEST_F(FileBackendTest, SetAtomicallyReplacesPreplacedSymlink) {
   char tbuf[64] = {};
   FILE* f = std::fopen(target.c_str(), "r");
   ASSERT_NE(f, nullptr);
-  (void)std::fread(tbuf, 1, sizeof(tbuf) - 1, f);
+  const size_t nread = std::fread(tbuf, 1, sizeof(tbuf) - 1, f);
+  (void)nread;
   std::fclose(f);
   EXPECT_STREQ("attacker_data", tbuf);
 
