@@ -1,4 +1,5 @@
-#pragma once // NOLINT(llvm-header-guard) -- #pragma once is used throughout; llvm-header-guard requires #ifndef-style guards
+#pragma once  // NOLINT(llvm-header-guard) -- #pragma once is used throughout; llvm-header-guard
+              // requires #ifndef-style guards
 
 #include <cstddef>
 
@@ -23,7 +24,9 @@ namespace sysprop::internal {
 //   All public methods are safe to call concurrently. Multiple simultaneous
 //   reads are always safe. Concurrent writes to different keys are safe.
 //   Concurrent writes to the same key are safe (last rename wins).
-class FileBackend final { // NOLINT(cppcoreguidelines-special-member-functions,hicpp-special-member-functions) -- default dtor only; FileBackend holds no heap resources so no move/copy needed
+class FileBackend
+    final {  // NOLINT(cppcoreguidelines-special-member-functions,hicpp-special-member-functions) --
+             // default dtor only; FileBackend holds no heap resources so no move/copy needed
  public:
   // base_path must point to an existing directory. The string is copied
   // internally; the caller's buffer need not outlive this constructor call.
@@ -38,11 +41,12 @@ class FileBackend final { // NOLINT(cppcoreguidelines-special-member-functions,h
   // Non-owning, non-allocating visitor passed to ForEach.
   // fn must not be null. The callable and its context must outlive the Visitor.
   struct Visitor {
-    bool (*fn)(void* ctx, const char* key, const char* value); // NOLINT(misc-non-private-member-variables-in-classes) -- Visitor is a POD-like callback carrier; public members are intentional
-    void* ctx; // NOLINT(misc-non-private-member-variables-in-classes)
-    bool operator()(const char* key, const char* value) const {
-      return fn(ctx, key, value);
-    }
+    bool (*fn)(
+        void* ctx, const char* key,
+        const char* value);  // NOLINT(misc-non-private-member-variables-in-classes) -- Visitor is a
+                             // POD-like callback carrier; public members are intentional
+    void* ctx;               // NOLINT(misc-non-private-member-variables-in-classes)
+    bool operator()(const char* key, const char* value) const { return fn(ctx, key, value); }
   };
 
   // Iterate over all stored properties. The visitor is called once per entry
@@ -61,11 +65,11 @@ class FileBackend final { // NOLINT(cppcoreguidelines-special-member-functions,h
 
 // Create a Visitor from any callable (lambda, functor). The callable is held
 // by pointer — it must outlive the returned Visitor.
-template<typename F>
+template <typename F>
 FileBackend::Visitor MakeVisitor(F& f) {
-  return {[](void* ctx, const char* k, const char* v) -> bool {
-    return (*static_cast<F*>(ctx))(k, v);
-  }, &f};
+  return {
+      [](void* ctx, const char* k, const char* v) -> bool { return (*static_cast<F*>(ctx))(k, v); },
+      &f};
 }
 
 }  // namespace sysprop::internal

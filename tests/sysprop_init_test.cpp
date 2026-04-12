@@ -1,5 +1,3 @@
-#include "defaults_loader.h"
-
 #include <unistd.h>
 
 #include <cerrno>
@@ -12,6 +10,7 @@
 #include <sys/stat.h>
 #include <sysprop/sysprop.h>
 
+#include "defaults_loader.h"
 #include "file_backend.h"
 #include "property_store.h"
 
@@ -59,8 +58,8 @@ class DefaultsLoaderTest : public ::testing::Test {
 
   std::string rt_dir_;
   std::string ps_dir_;
-  std::unique_ptr<FileBackend>   rt_backend_;
-  std::unique_ptr<FileBackend>   ps_backend_;
+  std::unique_ptr<FileBackend> rt_backend_;
+  std::unique_ptr<FileBackend> ps_backend_;
   std::unique_ptr<PropertyStore> store_;
 };
 
@@ -78,9 +77,9 @@ TEST_F(DefaultsLoaderTest, MultiplePropertiesReturnCorrectCount) {
       "ro.hw.board=armv8\n"
       "net.hostname=box\n");
   EXPECT_EQ(3, LoadDefaultsFile(f.c_str(), *store_));
-  EXPECT_EQ("1.0",   Get("ro.build.version"));
+  EXPECT_EQ("1.0", Get("ro.build.version"));
   EXPECT_EQ("armv8", Get("ro.hw.board"));
-  EXPECT_EQ("box",   Get("net.hostname"));
+  EXPECT_EQ("box", Get("net.hostname"));
 }
 
 TEST_F(DefaultsLoaderTest, EmptyFileReturnsZero) {
@@ -197,7 +196,9 @@ TEST_F(DefaultsLoaderTest, NonexistentFileReturnsMinusOne) {
 }
 
 TEST_F(DefaultsLoaderTest, UnreadableFileReturnsMinusOne) {
-  if (::getuid() == 0) { GTEST_SKIP() << "root bypasses permission checks"; }
+  if (::getuid() == 0) {
+    GTEST_SKIP() << "root bypasses permission checks";
+  }
   const auto f = WritePropFile("net.hostname=box\n");
   ASSERT_EQ(0, ::chmod(f.c_str(), 0000));
   EXPECT_EQ(-1, LoadDefaultsFile(f.c_str(), *store_));
@@ -229,7 +230,7 @@ TEST_F(DefaultsLoaderTest, ValueTooLongSkipped) {
   const auto f = WritePropFile(("net.bad=" + too_long + "\nnet.hostname=box\n").c_str());
   EXPECT_EQ(1, LoadDefaultsFile(f.c_str(), *store_));
   EXPECT_EQ("box", Get("net.hostname"));
-  EXPECT_EQ("",    Get("net.bad"));  // must not have been set
+  EXPECT_EQ("", Get("net.bad"));  // must not have been set
 }
 
 // A line longer than fgets buffer (SYSPROP_MAX_KEY_LENGTH + SYSPROP_MAX_VALUE_LENGTH + 2 = 514)
@@ -304,13 +305,13 @@ TEST_F(DefaultsLoaderTest, RealisticBuildProp) {
 
   EXPECT_EQ(7, LoadDefaultsFile(f.c_str(), *store_));
 
-  EXPECT_EQ("2.3.1",           Get("ro.build.version"));
-  EXPECT_EQ("2025-06-01",      Get("ro.build.date"));
-  EXPECT_EQ("armv8-a",         Get("ro.hw.board"));
-  EXPECT_EQ("standard",        Get("ro.hw.sku"));
+  EXPECT_EQ("2.3.1", Get("ro.build.version"));
+  EXPECT_EQ("2025-06-01", Get("ro.build.date"));
+  EXPECT_EQ("armv8-a", Get("ro.hw.board"));
+  EXPECT_EQ("standard", Get("ro.hw.sku"));
   EXPECT_EQ("embedded-device", Get("net.hostname"));
-  EXPECT_EQ("info",            Get("sys.log.level"));
-  EXPECT_EQ("UTC",             Get("persist.tz"));
+  EXPECT_EQ("info", Get("sys.log.level"));
+  EXPECT_EQ("UTC", Get("persist.tz"));
 
   // All ro.* must now be immutable.
   EXPECT_EQ(SYSPROP_ERR_READ_ONLY, store_->Set("ro.build.version", "evil"));

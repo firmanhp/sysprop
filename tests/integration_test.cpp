@@ -121,7 +121,6 @@ TEST_F(IntegrationTest, LoadPersistentPropertiesRestoresAfterReboot) {
     ASSERT_GE(n, 0);
     EXPECT_STREQ("UTC", buf_);
   }
-
 }
 
 // ── ForEach ───────────────────────────────────────────────────────────────────
@@ -147,7 +146,10 @@ TEST_F(IntegrationTest, ForEachEarlyStop) {
   ASSERT_EQ(SYSPROP_OK, store_->Set("c.z", "3"));
 
   int count = 0;
-  (void)store_->ForEach([&](const char*, const char*) { ++count; return false; });
+  (void)store_->ForEach([&](const char*, const char*) {
+    ++count;
+    return false;
+  });
   EXPECT_EQ(1, count);
 }
 
@@ -172,14 +174,13 @@ TEST_F(IntegrationTest, MultiplePersistPropsRestoreAfterReboot) {
       EXPECT_GE(n, 0) << key;
     }
   }
-
 }
 
 // ── Evil-attacker scenarios ───────────────────────────────────────────────────
 
 TEST_F(IntegrationTest, ShellMetacharacterKeysRejected) {
-  for (const char* key : {"key|pipe", "key;semi", "key&bg",
-                          "key$(sub)", "key`cmd`", "key>out", "key<in"}) {
+  for (const char* key :
+       {"key|pipe", "key;semi", "key&bg", "key$(sub)", "key`cmd`", "key>out", "key<in"}) {
     EXPECT_NE(SYSPROP_OK, store_->Set(key, "evil")) << "key=" << key;
     EXPECT_NE(SYSPROP_OK, store_->Get(key, buf_, sizeof(buf_))) << "key=" << key;
   }
@@ -224,8 +225,8 @@ TEST_F(IntegrationTest, FailedSetValueTooLongLeavesNoGhostKey) {
 TEST_F(IntegrationTest, FailedSetInvalidKeyLeavesNoAdjacentKeys) {
   ASSERT_NE(SYSPROP_OK, store_->Set("bad..key", "val"));
   EXPECT_EQ(SYSPROP_ERR_INVALID_KEY, store_->Get("bad..key", buf_, sizeof(buf_)));
-  EXPECT_EQ(SYSPROP_ERR_NOT_FOUND,   store_->Get("bad",      buf_, sizeof(buf_)));
-  EXPECT_EQ(SYSPROP_ERR_NOT_FOUND,   store_->Get("key",      buf_, sizeof(buf_)));
+  EXPECT_EQ(SYSPROP_ERR_NOT_FOUND, store_->Get("bad", buf_, sizeof(buf_)));
+  EXPECT_EQ(SYSPROP_ERR_NOT_FOUND, store_->Get("key", buf_, sizeof(buf_)));
 }
 
 TEST_F(IntegrationTest, GetOneByteBufNullTerminatedNoOverflow) {
@@ -249,7 +250,8 @@ TEST_F(IntegrationTest, RoPrefixTakesPrecedenceOverPersistPrefix) {
   ASSERT_EQ(SYSPROP_OK, store_->Set("ro.persist.cfg", "locked"));
   EXPECT_EQ(SYSPROP_ERR_READ_ONLY, store_->Set("ro.persist.cfg", "hacked"));
   char ps_path[512];
-  std::snprintf(ps_path, sizeof(ps_path), "%s/ro.persist.cfg", ps_dir_.c_str()); // NOLINT(cppcoreguidelines-pro-type-vararg)
+  std::snprintf(ps_path, sizeof(ps_path), "%s/ro.persist.cfg",
+                ps_dir_.c_str());  // NOLINT(cppcoreguidelines-pro-type-vararg)
   EXPECT_NE(0, ::access(ps_path, F_OK));
 }
 
@@ -271,17 +273,17 @@ TEST_F(IntegrationTest, TwoStoresOnSameRuntimeDirRoFirstWins) {
 // ── sysprop_error_string ──────────────────────────────────────────────────────
 
 TEST(ErrorString, CoversAllCodes) {
-  EXPECT_STREQ("ok",                sysprop_error_string(SYSPROP_OK));
-  EXPECT_STREQ("not found",         sysprop_error_string(SYSPROP_ERR_NOT_FOUND));
-  EXPECT_STREQ("read-only property",sysprop_error_string(SYSPROP_ERR_READ_ONLY));
-  EXPECT_STREQ("invalid key",       sysprop_error_string(SYSPROP_ERR_INVALID_KEY));
-  EXPECT_STREQ("value too long",    sysprop_error_string(SYSPROP_ERR_VALUE_TOO_LONG));
-  EXPECT_STREQ("key too long",      sysprop_error_string(SYSPROP_ERR_KEY_TOO_LONG));
-  EXPECT_STREQ("I/O error",         sysprop_error_string(SYSPROP_ERR_IO));
+  EXPECT_STREQ("ok", sysprop_error_string(SYSPROP_OK));
+  EXPECT_STREQ("not found", sysprop_error_string(SYSPROP_ERR_NOT_FOUND));
+  EXPECT_STREQ("read-only property", sysprop_error_string(SYSPROP_ERR_READ_ONLY));
+  EXPECT_STREQ("invalid key", sysprop_error_string(SYSPROP_ERR_INVALID_KEY));
+  EXPECT_STREQ("value too long", sysprop_error_string(SYSPROP_ERR_VALUE_TOO_LONG));
+  EXPECT_STREQ("key too long", sysprop_error_string(SYSPROP_ERR_KEY_TOO_LONG));
+  EXPECT_STREQ("I/O error", sysprop_error_string(SYSPROP_ERR_IO));
   EXPECT_STREQ("permission denied", sysprop_error_string(SYSPROP_ERR_PERMISSION));
-  EXPECT_STREQ("not initialized",   sysprop_error_string(SYSPROP_ERR_NOT_INITIALIZED));
-  EXPECT_STREQ("buffer too small",  sysprop_error_string(SYSPROP_ERR_BUFFER_TOO_SMALL));
-  EXPECT_STREQ("unknown error",     sysprop_error_string(-999));
+  EXPECT_STREQ("not initialized", sysprop_error_string(SYSPROP_ERR_NOT_INITIALIZED));
+  EXPECT_STREQ("buffer too small", sysprop_error_string(SYSPROP_ERR_BUFFER_TOO_SMALL));
+  EXPECT_STREQ("unknown error", sysprop_error_string(-999));
 }
 
 // ── Global C API via singleton ────────────────────────────────────────────────
@@ -504,9 +506,7 @@ TEST(UninitializedApi, DeleteReturnsNotInitialized) {
 }
 
 // sysprop_init(nullptr) uses compiled-in defaults; must not crash or fail.
-TEST(UninitializedApi, InitWithNullptrSucceeds) {
-  EXPECT_EQ(SYSPROP_OK, sysprop_init(nullptr));
-}
+TEST(UninitializedApi, InitWithNullptrSucceeds) { EXPECT_EQ(SYSPROP_OK, sysprop_init(nullptr)); }
 
 // ── C API: delete nonexistent key ─────────────────────────────────────────────
 

@@ -126,7 +126,10 @@ TEST_F(FileBackendTest, GetNullBuffer) {
 
 TEST_F(FileBackendTest, ForEachEmpty) {
   int count = 0;
-  auto fn = [&](const char*, const char*) { ++count; return true; };
+  auto fn = [&](const char*, const char*) {
+    ++count;
+    return true;
+  };
   const int rc = backend_->ForEach(MakeVisitor(fn));
   EXPECT_EQ(SYSPROP_OK, rc);
   EXPECT_EQ(0, count);
@@ -152,7 +155,10 @@ TEST_F(FileBackendTest, ForEachEarlyStop) {
   ASSERT_EQ(SYSPROP_OK, backend_->Set("c.key", "3"));
 
   int count = 0;
-  auto fn = [&](const char*, const char*) { ++count; return false; };
+  auto fn = [&](const char*, const char*) {
+    ++count;
+    return false;
+  };
   (void)backend_->ForEach(MakeVisitor(fn));
   EXPECT_EQ(1, count);
 }
@@ -167,7 +173,10 @@ TEST_F(FileBackendTest, ForEachSkipsTmpFiles) {
   ASSERT_EQ(SYSPROP_OK, backend_->Set("real.key", "v"));
 
   int count = 0;
-  auto fn = [&](const char*, const char*) { ++count; return true; };
+  auto fn = [&](const char*, const char*) {
+    ++count;
+    return true;
+  };
   (void)backend_->ForEach(MakeVisitor(fn));
   EXPECT_EQ(1, count);  // Only the real key, not the .tmp.* file.
 }
@@ -210,7 +219,7 @@ TEST_F(FileBackendTest, SetAtomicallyReplacesPreplacedSymlink) {
   ASSERT_EQ(SYSPROP_OK, backend_->Set("sym.key", "safe_value"));
 
   // The directory entry must now be a regular file, not a symlink.
-  struct stat st{};
+  struct stat st {};
   ASSERT_EQ(0, ::lstat((tmp_dir_ + "/sym.key").c_str(), &st));
   EXPECT_TRUE(S_ISREG(st.st_mode)) << "rename() must replace the symlink, not follow it";
 
@@ -230,7 +239,9 @@ TEST_F(FileBackendTest, SetAtomicallyReplacesPreplacedSymlink) {
 }
 
 TEST_F(FileBackendTest, GetUnreadablePropertyFileReturnsError) {
-  if (::getuid() == 0) { GTEST_SKIP() << "root bypasses permission checks"; }
+  if (::getuid() == 0) {
+    GTEST_SKIP() << "root bypasses permission checks";
+  }
   ASSERT_EQ(SYSPROP_OK, backend_->Set("perm.key", "secret"));
   ASSERT_EQ(0, ::chmod((tmp_dir_ + "/perm.key").c_str(), 0000));
   EXPECT_NE(SYSPROP_OK, backend_->Get("perm.key", buf_, sizeof(buf_)));
@@ -249,7 +260,10 @@ TEST_F(FileBackendTest, ForEachSkipsInjectedDotFiles) {
   ASSERT_EQ(SYSPROP_OK, backend_->Set("real.key", "v"));
 
   int count = 0;
-  auto fn = [&](const char*, const char*) { ++count; return true; };
+  auto fn = [&](const char*, const char*) {
+    ++count;
+    return true;
+  };
   (void)backend_->ForEach(MakeVisitor(fn));
   EXPECT_EQ(1, count);
 }
@@ -261,7 +275,10 @@ TEST_F(FileBackendTest, ForEachSkipsSubdirectories) {
   ASSERT_EQ(SYSPROP_OK, backend_->Set("real.key", "v"));
 
   int count = 0;
-  auto fn = [&](const char*, const char*) { ++count; return true; };
+  auto fn = [&](const char*, const char*) {
+    ++count;
+    return true;
+  };
   (void)backend_->ForEach(MakeVisitor(fn));
   EXPECT_EQ(1, count);
 }
@@ -270,11 +287,13 @@ TEST_F(FileBackendTest, ForEachWithManyKeys) {
   constexpr int kCount = 200;
   for (int i = 0; i < kCount; ++i) {
     ASSERT_EQ(SYSPROP_OK,
-              backend_->Set(("k." + std::to_string(i)).c_str(),
-                            std::to_string(i).c_str()));
+              backend_->Set(("k." + std::to_string(i)).c_str(), std::to_string(i).c_str()));
   }
   int count = 0;
-  auto fn = [&](const char*, const char*) { ++count; return true; };
+  auto fn = [&](const char*, const char*) {
+    ++count;
+    return true;
+  };
   (void)backend_->ForEach(MakeVisitor(fn));
   EXPECT_EQ(kCount, count);
 }

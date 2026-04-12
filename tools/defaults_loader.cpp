@@ -15,7 +15,8 @@ namespace sysprop::tools {
 int LoadDefaultsFile(const char* path, sysprop::internal::PropertyStore& store) {
   FILE* f = std::fopen(path, "r");
   if (f == nullptr) {
-    std::fprintf(stderr, "sysprop-init: cannot open defaults file '%s': %s\n", path, // NOLINT(cppcoreguidelines-pro-type-vararg)
+    std::fprintf(stderr, "sysprop-init: cannot open defaults file '%s': %s\n",
+                 path,  // NOLINT(cppcoreguidelines-pro-type-vararg)
                  std::strerror(errno));
     return -1;
   }
@@ -28,25 +29,32 @@ int LoadDefaultsFile(const char* path, sysprop::internal::PropertyStore& store) 
   int loaded = 0;
   int lineno = 0;
 
-  while (std::fgets(line, sizeof(line), f) != nullptr) { // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+  while (std::fgets(line, sizeof(line), f) !=
+         nullptr) {  // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
     ++lineno;
 
     // Strip trailing CR/LF.
-    std::size_t len = std::strlen(line); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+    std::size_t len =
+        std::strlen(line);  // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
     while (len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r')) {
       line[--len] = '\0';
     }
 
     // Skip leading whitespace, blank lines, and comments.
-    const char* p = line; // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
-    while (*p == ' ' || *p == '\t') { ++p; }
-    if (*p == '\0' || *p == '#') { continue; }
+    const char* p = line;  // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+    while (*p == ' ' || *p == '\t') {
+      ++p;
+    }
+    if (*p == '\0' || *p == '#') {
+      continue;
+    }
 
     // Split on the first '='.
     const char* eq = std::strchr(p, '=');
     if (eq == nullptr) {
-      std::fprintf(stderr, "sysprop-init: %s:%d: malformed line (missing '='): %s\n", path, lineno, // NOLINT(cppcoreguidelines-pro-type-vararg)
-                   line); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+      std::fprintf(stderr, "sysprop-init: %s:%d: malformed line (missing '='): %s\n", path,
+                   lineno,  // NOLINT(cppcoreguidelines-pro-type-vararg)
+                   line);   // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
       continue;
     }
 
@@ -58,7 +66,8 @@ int LoadDefaultsFile(const char* path, sysprop::internal::PropertyStore& store) 
     if (const int rc = store.Set(key.c_str(), value); rc == SYSPROP_OK) {
       ++loaded;
     } else {
-      std::fprintf(stderr, "sysprop-init: %s:%d: failed to set '%s': %s\n", path, lineno, // NOLINT(cppcoreguidelines-pro-type-vararg)
+      std::fprintf(stderr, "sysprop-init: %s:%d: failed to set '%s': %s\n", path,
+                   lineno,  // NOLINT(cppcoreguidelines-pro-type-vararg)
                    key.c_str(), sysprop_error_string(rc));
     }
   }

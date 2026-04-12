@@ -4,12 +4,8 @@
 // full policy layer (ro.*, persist.*) is exercised together with the CLI.
 // stdout is captured by redirecting STDOUT_FILENO to a pipe.
 
-#include "cli_commands.h"
-
 #include <fcntl.h>
 #include <unistd.h>
-
-#include <sysprop/sysprop.h>
 
 #include <array>
 #include <cstdio>
@@ -17,7 +13,9 @@
 #include <string>
 
 #include <gtest/gtest.h>
+#include <sysprop/sysprop.h>
 
+#include "cli_commands.h"
 #include "file_backend.h"
 #include "property_store.h"
 
@@ -39,7 +37,7 @@ class CliTest : public ::testing::Test {
     dir_ = d;
 
     runtime_ = std::make_unique<FileBackend>(dir_.c_str());
-    store_   = std::make_unique<PropertyStore>(runtime_.get(), nullptr);
+    store_ = std::make_unique<PropertyStore>(runtime_.get(), nullptr);
   }
 
   void TearDown() override {
@@ -52,9 +50,7 @@ class CliTest : public ::testing::Test {
   }
 
   // Set a property directly via the store (bypassing CLI).
-  void Set(const char* key, const char* value) {
-    ASSERT_EQ(store_->Set(key, value), SYSPROP_OK);
-  }
+  void Set(const char* key, const char* value) { ASSERT_EQ(store_->Set(key, value), SYSPROP_OK); }
 
   // ── stdout capture helpers ────────────────────────────────────────────────
 
@@ -88,11 +84,11 @@ class CliTest : public ::testing::Test {
   }
 
   std::string dir_;
-  std::unique_ptr<FileBackend>   runtime_;
+  std::unique_ptr<FileBackend> runtime_;
   std::unique_ptr<PropertyStore> store_;
 
  private:
-  int pipe_fds_[2]  = {-1, -1};
+  int pipe_fds_[2] = {-1, -1};
   int saved_stdout_ = -1;
 };
 
@@ -100,7 +96,7 @@ class CliTest : public ::testing::Test {
 
 // Build a mutable argv array from a list of string literals so it can be
 // passed to the CLI functions (which take char*[], not const char*[]).
-template<std::size_t N>
+template <std::size_t N>
 std::array<char*, N> MakeArgv(const char* (&src)[N]) {
   std::array<char*, N> out;
   for (std::size_t i = 0; i < N; ++i) {

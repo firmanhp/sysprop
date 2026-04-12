@@ -1,4 +1,5 @@
-#pragma once // NOLINT(llvm-header-guard) -- #pragma once is used throughout; llvm-header-guard requires #ifndef-style guards
+#pragma once  // NOLINT(llvm-header-guard) -- #pragma once is used throughout; llvm-header-guard
+              // requires #ifndef-style guards
 
 #include <string_view>
 

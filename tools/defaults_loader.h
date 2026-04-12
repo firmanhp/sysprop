@@ -1,6 +1,8 @@
 #pragma once
 
-namespace sysprop::internal { class PropertyStore; }
+namespace sysprop::internal {
+class PropertyStore;
+}
 
 namespace sysprop::tools {
 

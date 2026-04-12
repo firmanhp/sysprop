@@ -14,10 +14,10 @@ void CleanupTmpFiles(const char* dir);
 
 // Parsed result of sysprop-init command-line arguments.
 struct InitArgs {
-  const char* runtime_dir    = SYSPROP_RUNTIME_DIR;
+  const char* runtime_dir = SYSPROP_RUNTIME_DIR;
   const char* persistent_dir = SYSPROP_PERSISTENT_DIR;
-  const char* defaults_file  = nullptr;
-  bool enable_persistence    = true;
+  const char* defaults_file = nullptr;
+  bool enable_persistence = true;
 };
 
 // Parse sysprop-init argc/argv. Environment variables SYSPROP_RUNTIME_DIR and

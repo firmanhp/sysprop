@@ -47,7 +47,6 @@ void BM_Get(benchmark::State& state) {
     benchmark::DoNotOptimize(store.Get("bench.target", buf, sizeof(buf)));
   }
   state.SetItemsProcessed(state.iterations());
-
 }
 BENCHMARK(BM_Get);
 
@@ -61,7 +60,6 @@ void BM_GetMissing(benchmark::State& state) {
     benchmark::DoNotOptimize(store.Get("no.such.key", buf, sizeof(buf)));
   }
   state.SetItemsProcessed(state.iterations());
-
 }
 BENCHMARK(BM_GetMissing);
 
@@ -74,7 +72,6 @@ void BM_Set(benchmark::State& state) {
     benchmark::DoNotOptimize(store.Set("bench.write.key", "benchmark_value"));
   }
   state.SetItemsProcessed(state.iterations());
-
 }
 BENCHMARK(BM_Set);
 
@@ -95,7 +92,6 @@ void BM_List(benchmark::State& state) {
     benchmark::DoNotOptimize(count);
   }
   state.SetItemsProcessed(state.iterations() * state.range(0));
-
 }
 BENCHMARK(BM_List)->Arg(10)->Arg(100)->Arg(1000);
 

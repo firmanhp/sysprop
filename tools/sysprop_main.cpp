@@ -33,8 +33,12 @@ const char* ProgName(const char* argv0) noexcept {
 
 sysprop_config_t ConfigFromEnv() {
   sysprop_config_t cfg{SYSPROP_RUNTIME_DIR, SYSPROP_PERSISTENT_DIR, 1};
-  if (const char* rd = std::getenv("SYSPROP_RUNTIME_DIR")) { cfg.runtime_dir = rd; }
-  if (const char* pd = std::getenv("SYSPROP_PERSISTENT_DIR")) { cfg.persistent_dir = pd; }
+  if (const char* rd = std::getenv("SYSPROP_RUNTIME_DIR")) {
+    cfg.runtime_dir = rd;
+  }
+  if (const char* pd = std::getenv("SYSPROP_PERSISTENT_DIR")) {
+    cfg.persistent_dir = pd;
+  }
   return cfg;
 }
 

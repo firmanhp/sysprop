@@ -37,12 +37,12 @@ class PropertyStoreTest : public ::testing::Test {
     return ::access((dir + "/" + key).c_str(), F_OK) == 0;
   }
 
-  std::string   rt_dir_;
-  std::string   ps_dir_;
-  FileBackend   rt_backend_{testing::TempDir().c_str()};  // overwritten in SetUp
-  FileBackend   ps_backend_{testing::TempDir().c_str()};
+  std::string rt_dir_;
+  std::string ps_dir_;
+  FileBackend rt_backend_{testing::TempDir().c_str()};  // overwritten in SetUp
+  FileBackend ps_backend_{testing::TempDir().c_str()};
   PropertyStore store_{&rt_backend_, &ps_backend_};
-  char          buf_[SYSPROP_MAX_VALUE_LENGTH] = {};
+  char buf_[SYSPROP_MAX_VALUE_LENGTH] = {};
 };
 
 // ── Validation ────────────────────────────────────────────────────────────────
@@ -93,7 +93,10 @@ TEST_F(PropertyStoreTest, ForEachIteratesRuntimeProperties) {
   ASSERT_EQ(SYSPROP_OK, store_.Set("c.z", "3"));
 
   int count = 0;
-  (void)store_.ForEach([&](const char*, const char*) { ++count; return true; });
+  (void)store_.ForEach([&](const char*, const char*) {
+    ++count;
+    return true;
+  });
   EXPECT_EQ(3, count);
 }
 
@@ -103,7 +106,10 @@ TEST_F(PropertyStoreTest, ForEachEarlyStop) {
   ASSERT_EQ(SYSPROP_OK, store_.Set("c.z", "3"));
 
   int count = 0;
-  (void)store_.ForEach([&](const char*, const char*) { ++count; return false; });
+  (void)store_.ForEach([&](const char*, const char*) {
+    ++count;
+    return false;
+  });
   EXPECT_EQ(1, count);
 }
 
@@ -282,7 +288,9 @@ TEST_F(PropertyStoreTest, PersistDeleteCascadesToPersistentBackend) {
 // Delete of persist.* when persistent backend delete fails: runtime delete
 // still succeeds, so SYSPROP_OK is returned (persistent error is discarded).
 TEST_F(PropertyStoreTest, PersistDeletePersistentFailureReturnsOk) {
-  if (::getuid() == 0) { GTEST_SKIP() << "root bypasses permission checks"; }
+  if (::getuid() == 0) {
+    GTEST_SKIP() << "root bypasses permission checks";
+  }
   ASSERT_EQ(SYSPROP_OK, store_.Set("persist.wifi.ssid", "Home"));
   // Make the persistent dir unwritable so Delete fails there.
   ASSERT_EQ(0, ::chmod(ps_dir_.c_str(), 0555)) << strerror(errno);
@@ -327,13 +335,18 @@ TEST_F(PropertyStoreTest, LoadPersistentPropertiesPopulatesRuntime) {
 // When the runtime backend's directory cannot be read, ForEach returns an error
 // and the error propagates through PropertyStore::ForEach.
 TEST_F(PropertyStoreTest, ForEachPropagatesBackendError) {
-  if (::getuid() == 0) { GTEST_SKIP() << "root bypasses permission checks"; }
+  if (::getuid() == 0) {
+    GTEST_SKIP() << "root bypasses permission checks";
+  }
   ASSERT_EQ(SYSPROP_OK, store_.Set("hw.ok", "yes"));
   // Remove execute (search) permission on the runtime dir so opendir() fails.
   ASSERT_EQ(0, ::chmod(rt_dir_.c_str(), 0000)) << strerror(errno);
   int count = 0;
-  const int rc = store_.ForEach([&](const char*, const char*) { ++count; return true; });
+  const int rc = store_.ForEach([&](const char*, const char*) {
+    ++count;
+    return true;
+  });
   ::chmod(rt_dir_.c_str(), 0755);
-  EXPECT_LT(rc, 0);   // should be SYSPROP_ERR_IO
+  EXPECT_LT(rc, 0);  // should be SYSPROP_ERR_IO
   EXPECT_EQ(0, count);
 }

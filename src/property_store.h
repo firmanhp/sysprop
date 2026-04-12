@@ -1,4 +1,5 @@
-#pragma once // NOLINT(llvm-header-guard) -- #pragma once is used throughout; llvm-header-guard requires #ifndef-style guards
+#pragma once  // NOLINT(llvm-header-guard) -- #pragma once is used throughout; llvm-header-guard
+              // requires #ifndef-style guards
 
 #include <cstddef>
 
@@ -29,7 +30,7 @@ class PropertyStore {
 
   // Iterate over all runtime properties.
   // Accepts any callable: ForEach([&](const char* key, const char* value) { ... });
-  template<typename F>
+  template <typename F>
   [[nodiscard]] int ForEach(F f) {
     auto v = MakeVisitor(f);
     return ForEachImpl(v);

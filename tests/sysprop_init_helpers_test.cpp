@@ -1,9 +1,6 @@
 // Tests for init_helpers.h: MkdirP, CleanupTmpFiles, and ParseInitArgs.
 
-#include "init_helpers.h"
-
 #include <fcntl.h>
-#include <sys/stat.h>
 #include <unistd.h>
 
 #include <array>
@@ -13,25 +10,30 @@
 #include <vector>
 
 #include <gtest/gtest.h>
+#include <sys/stat.h>
+
+#include "init_helpers.h"
 
 namespace {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 bool PathExists(const std::string& path) {
-  struct stat st{};
+  struct stat st {};
   return ::stat(path.c_str(), &st) == 0;
 }
 
 bool IsDirectory(const std::string& path) {
-  struct stat st{};
+  struct stat st {};
   return ::stat(path.c_str(), &st) == 0 && S_ISDIR(st.st_mode);
 }
 
 // Create a regular file at path with the given content.
 bool WriteFile(const std::string& path, const char* content = "") {
   const int fd = ::open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
-  if (fd < 0) { return false; }
+  if (fd < 0) {
+    return false;
+  }
   const ssize_t n = ::write(fd, content, std::strlen(content));
   ::close(fd);
   return n >= 0;
@@ -120,13 +122,9 @@ class CleanupTmpFilesTest : public ::testing::Test {
   }
 
   // Create a file named `name` in the test directory.
-  void Touch(const std::string& name) {
-    ASSERT_TRUE(WriteFile(dir_ + "/" + name));
-  }
+  void Touch(const std::string& name) { ASSERT_TRUE(WriteFile(dir_ + "/" + name)); }
 
-  bool Exists(const std::string& name) {
-    return PathExists(dir_ + "/" + name);
-  }
+  bool Exists(const std::string& name) { return PathExists(dir_ + "/" + name); }
 
   std::string dir_;
 };
@@ -200,7 +198,7 @@ TEST_F(CleanupTmpFilesTest, MultipleOldCrashFilesAllRemoved) {
 namespace {
 
 // Build a mutable argv array from string-literal pointers.
-template<std::size_t N>
+template <std::size_t N>
 std::array<char*, N> MakeArgv(const char* (&src)[N]) {
   std::array<char*, N> out;
   for (std::size_t i = 0; i < N; ++i) {
@@ -220,7 +218,7 @@ TEST(ParseInitArgsTest, DefaultsWhenNoArgsAndNoEnv) {
   const char* argv[] = {"sysprop-init"};
   auto av = MakeArgv(argv);
   const auto args = sysprop::tools::ParseInitArgs(1, av.data());
-  EXPECT_STREQ(args.runtime_dir,    SYSPROP_RUNTIME_DIR);
+  EXPECT_STREQ(args.runtime_dir, SYSPROP_RUNTIME_DIR);
   EXPECT_STREQ(args.persistent_dir, SYSPROP_PERSISTENT_DIR);
   EXPECT_EQ(args.defaults_file, nullptr);
   EXPECT_TRUE(args.enable_persistence);
@@ -264,18 +262,13 @@ TEST(ParseInitArgsTest, PositionalArgIsDefaultsFile) {
 TEST(ParseInitArgsTest, AllFlagsCombined) {
   ::unsetenv("SYSPROP_RUNTIME_DIR");
   ::unsetenv("SYSPROP_PERSISTENT_DIR");
-  const char* argv[] = {
-    "sysprop-init",
-    "--runtime-dir",    "/run/rt",
-    "--persistent-dir", "/etc/ps",
-    "--no-persistence",
-    "/etc/build.prop"
-  };
+  const char* argv[] = {"sysprop-init", "--runtime-dir",    "/run/rt",        "--persistent-dir",
+                        "/etc/ps",      "--no-persistence", "/etc/build.prop"};
   auto av = MakeArgv(argv);
   const auto args = sysprop::tools::ParseInitArgs(7, av.data());
-  EXPECT_STREQ(args.runtime_dir,    "/run/rt");
+  EXPECT_STREQ(args.runtime_dir, "/run/rt");
   EXPECT_STREQ(args.persistent_dir, "/etc/ps");
-  EXPECT_STREQ(args.defaults_file,  "/etc/build.prop");
+  EXPECT_STREQ(args.defaults_file, "/etc/build.prop");
   EXPECT_FALSE(args.enable_persistence);
 }
 
@@ -303,16 +296,13 @@ TEST(ParseInitArgsTest, EnvVarOverridesPersistentDir) {
 
 // Explicit --runtime-dir flag takes precedence over SYSPROP_RUNTIME_DIR env var.
 TEST(ParseInitArgsTest, FlagOverridesEnvVar) {
-  ::setenv("SYSPROP_RUNTIME_DIR",    "/env/rt", 1);
+  ::setenv("SYSPROP_RUNTIME_DIR", "/env/rt", 1);
   ::setenv("SYSPROP_PERSISTENT_DIR", "/env/ps", 1);
-  const char* argv[] = {
-    "sysprop-init",
-    "--runtime-dir",    "/flag/rt",
-    "--persistent-dir", "/flag/ps"
-  };
+  const char* argv[] = {"sysprop-init", "--runtime-dir", "/flag/rt", "--persistent-dir",
+                        "/flag/ps"};
   auto av = MakeArgv(argv);
   const auto args = sysprop::tools::ParseInitArgs(5, av.data());
-  EXPECT_STREQ(args.runtime_dir,    "/flag/rt");
+  EXPECT_STREQ(args.runtime_dir, "/flag/rt");
   EXPECT_STREQ(args.persistent_dir, "/flag/ps");
   ::unsetenv("SYSPROP_RUNTIME_DIR");
   ::unsetenv("SYSPROP_PERSISTENT_DIR");

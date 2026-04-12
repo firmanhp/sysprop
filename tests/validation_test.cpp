@@ -26,14 +26,10 @@ TEST(ValidateKey, AcceptsAllAllowedCharacters) {
 }
 
 // A key consisting solely of a hyphen is valid (hyphen is an allowed charset char).
-TEST(ValidateKey, AcceptsSingleHyphen) {
-  EXPECT_EQ(SYSPROP_OK, ValidateKey("-"));
-}
+TEST(ValidateKey, AcceptsSingleHyphen) { EXPECT_EQ(SYSPROP_OK, ValidateKey("-")); }
 
 // A key consisting solely of digits is valid.
-TEST(ValidateKey, AcceptsDigitsOnly) {
-  EXPECT_EQ(SYSPROP_OK, ValidateKey("42"));
-}
+TEST(ValidateKey, AcceptsDigitsOnly) { EXPECT_EQ(SYSPROP_OK, ValidateKey("42")); }
 
 TEST(ValidateKey, RejectsEmpty) { EXPECT_EQ(SYSPROP_ERR_INVALID_KEY, ValidateKey("")); }
 
@@ -65,13 +61,9 @@ TEST(ValidateKey, AcceptsMaxLength) {
   EXPECT_EQ(SYSPROP_OK, ValidateKey(std::string(SYSPROP_MAX_KEY_LENGTH - 1, 'a')));
 }
 
-TEST(ValidateKey, RejectsSingleDot) {
-  EXPECT_EQ(SYSPROP_ERR_INVALID_KEY, ValidateKey("."));
-}
+TEST(ValidateKey, RejectsSingleDot) { EXPECT_EQ(SYSPROP_ERR_INVALID_KEY, ValidateKey(".")); }
 
-TEST(ValidateKey, RejectsAtSign) {
-  EXPECT_EQ(SYSPROP_ERR_INVALID_KEY, ValidateKey("a@b"));
-}
+TEST(ValidateKey, RejectsAtSign) { EXPECT_EQ(SYSPROP_ERR_INVALID_KEY, ValidateKey("a@b")); }
 
 TEST(ValidateKey, RejectsPathTraversal) {
   EXPECT_EQ(SYSPROP_ERR_INVALID_KEY, ValidateKey("../etc/passwd"));
@@ -81,9 +73,9 @@ TEST(ValidateKey, RejectsPathTraversal) {
 // ── Shell-injection attempts ──────────────────────────────────────────────────
 
 TEST(ValidateKey, RejectsShellMetacharacters) {
-  for (const char* k : {"key|pipe", "key;semi", "key&bg", "key$(subshell)",
-                        "key`backtick`", "key>redir", "key<redir",
-                        "key(open", "key)close", "key*glob", "key?wild"}) {
+  for (const char* k :
+       {"key|pipe", "key;semi", "key&bg", "key$(subshell)", "key`backtick`", "key>redir",
+        "key<redir", "key(open", "key)close", "key*glob", "key?wild"}) {
     EXPECT_EQ(SYSPROP_ERR_INVALID_KEY, ValidateKey(k)) << "key=" << k;
   }
 }
@@ -98,11 +90,17 @@ TEST(ValidateKey, RejectsControlCharacters) {
   // Tab
   EXPECT_EQ(SYSPROP_ERR_INVALID_KEY, ValidateKey(std::string_view("a\tb", 3)));
   // SOH (0x01) — common in binary injection probes
-  EXPECT_EQ(SYSPROP_ERR_INVALID_KEY, ValidateKey(std::string_view("a\x01" "b", 3)));
+  EXPECT_EQ(SYSPROP_ERR_INVALID_KEY, ValidateKey(std::string_view("a\x01"
+                                                                  "b",
+                                                                  3)));
   // DEL (0x7f)
-  EXPECT_EQ(SYSPROP_ERR_INVALID_KEY, ValidateKey(std::string_view("a\x7f" "b", 3)));
+  EXPECT_EQ(SYSPROP_ERR_INVALID_KEY, ValidateKey(std::string_view("a\x7f"
+                                                                  "b",
+                                                                  3)));
   // ESC (0x1b) — terminal-escape injection
-  EXPECT_EQ(SYSPROP_ERR_INVALID_KEY, ValidateKey(std::string_view("a\x1b" "b", 3)));
+  EXPECT_EQ(SYSPROP_ERR_INVALID_KEY, ValidateKey(std::string_view("a\x1b"
+                                                                  "b",
+                                                                  3)));
 }
 
 // ── High-byte / Unicode injection ─────────────────────────────────────────────
@@ -111,9 +109,13 @@ TEST(ValidateKey, RejectsHighBytes) {
   // UTF-8 multi-byte sequence ("café")
   EXPECT_EQ(SYSPROP_ERR_INVALID_KEY, ValidateKey(std::string_view("caf\xc3\xa9", 5)));
   // Lone continuation byte
-  EXPECT_EQ(SYSPROP_ERR_INVALID_KEY, ValidateKey(std::string_view("k\x80" "ey", 4)));
+  EXPECT_EQ(SYSPROP_ERR_INVALID_KEY, ValidateKey(std::string_view("k\x80"
+                                                                  "ey",
+                                                                  4)));
   // 0xff — invalid in any UTF-8 encoding
-  EXPECT_EQ(SYSPROP_ERR_INVALID_KEY, ValidateKey(std::string_view("k\xff" "ey", 4)));
+  EXPECT_EQ(SYSPROP_ERR_INVALID_KEY, ValidateKey(std::string_view("k\xff"
+                                                                  "ey",
+                                                                  4)));
 }
 
 // ── Backslash (Windows-path injection) ───────────────────────────────────────
@@ -154,8 +156,7 @@ TEST(ValidateValue, AcceptsMaxLength) {
 }
 
 TEST(ValidateValue, RejectsTooLong) {
-  EXPECT_EQ(SYSPROP_ERR_VALUE_TOO_LONG,
-            ValidateValue(std::string(SYSPROP_MAX_VALUE_LENGTH, 'x')));
+  EXPECT_EQ(SYSPROP_ERR_VALUE_TOO_LONG, ValidateValue(std::string(SYSPROP_MAX_VALUE_LENGTH, 'x')));
 }
 
 TEST(ValidateValue, RejectsEmbeddedNull) {
