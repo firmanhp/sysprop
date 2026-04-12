@@ -71,9 +71,4 @@ Test files and what they cover:
 
 Lints `src/` only (`HeaderFilterRegex: '.*/sysprop/(src|include)/.*'`). Tests are not linted.
 
-Suppress findings inline at the offending line, not in `.clang-tidy`:
-```cpp
-::open(path, O_RDONLY | O_CLOEXEC); // NOLINT(cppcoreguidelines-pro-type-vararg)
-```
-
-Include the check name so suppressions are auditable. Do not add blanket suppressions to `.clang-tidy`.
+Suppress findings in `.clang-tidy` by removing the check from the `Checks:` list. Inline `NOLINT` comments are reserved for truly isolated one-off cases; if a check fires on more than ~10 sites, disable it globally.

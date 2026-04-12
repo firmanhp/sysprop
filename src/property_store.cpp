@@ -3,6 +3,8 @@
 #include <cstdio>
 #include <string_view>
 
+#include "file_backend.h"  // direct include: FileBackend and MakeVisitor used below
+
 #include <sysprop/sysprop.h>
 
 #include "validation.h"
@@ -47,7 +49,7 @@ int PropertyStore::Set(const char* key, const char* value) {
     if (const int prc = persistent_->Set(key, value); prc != SYSPROP_OK) {
       // Non-fatal: log a warning but do not fail the overall Set — the runtime
       // store is the source of truth.
-      (void)std::fprintf(stderr, "sysprop: warning: failed to persist property '%s' (err=%d)\n", key, // NOLINT(cppcoreguidelines-pro-type-vararg)
+      (void)std::fprintf(stderr, "sysprop: warning: failed to persist property '%s' (err=%d)\n", key,
                          prc);
     }
   }
@@ -93,7 +95,7 @@ int PropertyStore::LoadPersistentProperties() {
     if (SetRuntimeOnly(key, value) == SYSPROP_OK) {
       ++load_count;
     } else {
-      (void)std::fprintf(stderr, "sysprop: warning: failed to load persistent property '%s'\n", key); // NOLINT(cppcoreguidelines-pro-type-vararg)
+      (void)std::fprintf(stderr, "sysprop: warning: failed to load persistent property '%s'\n", key);
     }
     return true;  // continue iteration
   };

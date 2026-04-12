@@ -1,51 +1,65 @@
 ---
 # clang-tidy configuration for sysprop.
 # Only our own source files are linted (see HeaderFilterRegex + lint.sh).
+#
+# Approach: enable ALL checks (*), then blacklist those incompatible with
+# deliberate design decisions. Rationale for each disabled check is below.
+#
+# Disabled check rationale
+# ────────────────────────
+# -cppcoreguidelines-pro-bounds-array-to-pointer-decay, -hicpp-no-array-decay:
+#   The no-heap design intentionally uses stack char[] buffers passed by pointer
+#   throughout (path construction, value reads, typed helpers). Every call site
+#   would need NOLINT; the pattern is load-bearing, not a bug.
+#
+# -cppcoreguidelines-pro-type-vararg, -hicpp-vararg:
+#   POSIX syscalls (open(2)) and C stdio (snprintf, fprintf) are unavoidable.
+#   Wrapping them in type-safe shims adds complexity with no safety benefit
+#   in this controlled internal code.
+#
+# -modernize-use-trailing-return-type:
+#   The codebase uses traditional C-style return-type syntax throughout.
+#   Trailing returns would be churn with no correctness benefit.
+#
+# -readability-identifier-length:
+#   Short names (n, rc, fd, s, c) are idiomatic in C/POSIX contexts and within
+#   tight one-liner expressions. They are self-evident from context.
+#
+# -readability-implicit-bool-conversion:
+#   Null-pointer checks via if(!ptr) and integer checks via if(rc < 0) are
+#   idiomatic C++. Spelling out != nullptr / != 0 everywhere would be verbose.
+#
+# -cppcoreguidelines-macro-to-enum, -modernize-macro-to-enum:
+#   Error codes are #define macros by design so the header stays valid C.
+#   enum class is C++-only; a plain C enum would still require casts on the
+#   C side, defeating the purpose of the shared header.
+#
+# -cppcoreguidelines-avoid-c-arrays, -hicpp-avoid-c-arrays, -modernize-avoid-c-arrays:
+#   Stack char[] buffers are fundamental to the no-heap design.
+#   std::array<char,N> would not reduce risk here and would be more verbose.
+#
+# -llvmlibc-*, -altera-*, -fuchsia-*, -android-*, -linuxkernel-*:
+#   Platform/framework-specific check suites not relevant to this project.
 
 Checks: >-
-  -*,
-  bugprone-*,
-  cert-dcl50-cpp,
-  cert-dcl58-cpp,
-  cert-err33-c,
-  cert-err34-c,
-  cert-flp30-c,
-  cert-mem57-cpp,
-  cert-msc50-cpp,
-  cert-msc51-cpp,
-  clang-analyzer-*,
-  cppcoreguidelines-init-variables,
-  cppcoreguidelines-narrowing-conversions,
-  cppcoreguidelines-no-malloc,
-  cppcoreguidelines-pro-bounds-array-to-pointer-decay,
-  cppcoreguidelines-pro-bounds-constant-array-index,
-  cppcoreguidelines-pro-type-cstyle-cast,
-  cppcoreguidelines-pro-type-reinterpret-cast,
-  cppcoreguidelines-pro-type-vararg,
-  cppcoreguidelines-slicing,
-  misc-misplaced-const,
-  misc-redundant-expression,
-  misc-unused-parameters,
-  misc-unused-using-decls,
-  modernize-use-nullptr,
-  modernize-use-override,
-  performance-for-range-copy,
-  performance-implicit-conversion-in-loop,
-  performance-inefficient-string-concatenation,
-  performance-move-const-arg,
-  performance-unnecessary-copy-initialization,
-  portability-*,
-  readability-braces-around-statements,
-  readability-const-return-type,
-  readability-container-size-empty,
-  readability-delete-null-pointer,
-  readability-misplaced-array-index,
-  readability-non-const-parameter,
-  readability-redundant-control-flow,
-  readability-redundant-preprocessor,
-  readability-simplify-boolean-expr,
-  readability-string-compare,
-  readability-suspicious-call-argument
+  *,
+  -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+  -hicpp-no-array-decay,
+  -cppcoreguidelines-pro-type-vararg,
+  -hicpp-vararg,
+  -modernize-use-trailing-return-type,
+  -readability-identifier-length,
+  -readability-implicit-bool-conversion,
+  -cppcoreguidelines-macro-to-enum,
+  -modernize-macro-to-enum,
+  -cppcoreguidelines-avoid-c-arrays,
+  -hicpp-avoid-c-arrays,
+  -modernize-avoid-c-arrays,
+  -llvmlibc-*,
+  -altera-*,
+  -fuchsia-*,
+  -android-*,
+  -linuxkernel-*,
 
 # Treat warnings as errors in CI — remove WarningsAsErrors to allow
 # advisory-only runs during development.

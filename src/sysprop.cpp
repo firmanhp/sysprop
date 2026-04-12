@@ -3,7 +3,7 @@
 #include <cerrno>
 #include <cstdlib>
 #include <cstring>
-#include <new>
+#include <new> // NOLINT(misc-include-cleaner) -- required for placement new (new (s_storage) ...) even though it arrives transitively
 #include <optional>
 #include <string_view>
 
@@ -39,16 +39,16 @@ struct GlobalStore {
     return std::nullopt;
   }
 
-  FileBackend                runtime_;
-  std::optional<FileBackend> persistent_;
-  PropertyStore              store_;
+  FileBackend                runtime_;   // NOLINT(misc-non-private-member-variables-in-classes) -- GlobalStore is an internal impl struct, not a public API class
+  std::optional<FileBackend> persistent_; // NOLINT(misc-non-private-member-variables-in-classes)
+  PropertyStore              store_;      // NOLINT(misc-non-private-member-variables-in-classes)
 };
 
 // Raw storage avoids any static-initializer or atexit registration.
 // Placement-new'd by sysprop_init(); never explicitly destructed (lifetime
 // matches the process — the OS reclaims on exit).
-alignas(GlobalStore) static unsigned char s_storage[sizeof(GlobalStore)];
-static GlobalStore* s_instance = nullptr;
+alignas(GlobalStore) static unsigned char s_storage[sizeof(GlobalStore)]; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables,readability-static-definition-in-anonymous-namespace) -- placement-new singleton buffer; intentionally non-const and file-scoped
+static GlobalStore* s_instance = nullptr; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables,readability-static-definition-in-anonymous-namespace) -- singleton pointer; null until sysprop_init()
 
 PropertyStore* GetStore() {
   return s_instance ? &s_instance->store_ : nullptr;
@@ -78,7 +78,7 @@ const char* sysprop_error_string(int err) {
 
 int sysprop_init(const sysprop_config_t* config) {
   if (s_instance) { return SYSPROP_OK; }  // already initialized; ignore
-  s_instance = new (s_storage) GlobalStore{config}; // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+  s_instance = new (s_storage) GlobalStore{config}; // NOLINT(cppcoreguidelines-owning-memory) -- placement new into static storage; no heap allocation, ownership concept does not apply
   return SYSPROP_OK;
 }
 
@@ -103,21 +103,21 @@ int sysprop_delete(const char* key) {
 int sysprop_get_int(const char* key, int default_value) {
   char buf[SYSPROP_MAX_VALUE_LENGTH];
   PropertyStore* s = GetStore();
-  if (!s || s->Get(key, buf, sizeof(buf)) < 0) { return default_value; } // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+  if (!s || s->Get(key, buf, sizeof(buf)) < 0) { return default_value; }
 
   char* end = nullptr;
   errno = 0;
-  const long val = std::strtol(buf, &end, 10); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
-  if (end == buf || errno != 0) { return default_value; } // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+  const long val = std::strtol(buf, &end, 10); // NOLINT(google-runtime-int) -- strtol returns long by specification; narrowing to int64_t would misrepresent the API
+  if (end == buf || errno != 0) { return default_value; }
   return static_cast<int>(val);
 }
 
 int sysprop_get_bool(const char* key, int default_value) {
   char buf[SYSPROP_MAX_VALUE_LENGTH];
   PropertyStore* s = GetStore();
-  if (!s || s->Get(key, buf, sizeof(buf)) < 0) { return default_value ? 1 : 0; } // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+  if (!s || s->Get(key, buf, sizeof(buf)) < 0) { return default_value ? 1 : 0; }
 
-  const std::string_view sv{buf}; // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+  const std::string_view sv{buf};
   if (sv == "1" || sv == "true" || sv == "yes" || sv == "on") { return 1; }
   if (sv == "0" || sv == "false" || sv == "no" || sv == "off") { return 0; }
   return default_value ? 1 : 0;
@@ -126,12 +126,12 @@ int sysprop_get_bool(const char* key, int default_value) {
 float sysprop_get_float(const char* key, float default_value) {
   char buf[SYSPROP_MAX_VALUE_LENGTH];
   PropertyStore* s = GetStore();
-  if (!s || s->Get(key, buf, sizeof(buf)) < 0) { return default_value; } // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+  if (!s || s->Get(key, buf, sizeof(buf)) < 0) { return default_value; }
 
   char* end = nullptr;
   errno = 0;
-  const float val = std::strtof(buf, &end); // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
-  if (end == buf || errno != 0) { return default_value; } // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+  const float val = std::strtof(buf, &end);
+  if (end == buf || errno != 0) { return default_value; }
   return val;
 }
 

@@ -1,4 +1,4 @@
-#pragma once
+#pragma once // NOLINT(llvm-header-guard) -- #pragma once is used throughout; llvm-header-guard requires #ifndef-style guards
 
 #include <cstddef>
 
@@ -23,7 +23,7 @@ namespace sysprop::internal {
 //   All public methods are safe to call concurrently. Multiple simultaneous
 //   reads are always safe. Concurrent writes to different keys are safe.
 //   Concurrent writes to the same key are safe (last rename wins).
-class FileBackend final {
+class FileBackend final { // NOLINT(cppcoreguidelines-special-member-functions,hicpp-special-member-functions) -- default dtor only; FileBackend holds no heap resources so no move/copy needed
  public:
   // base_path must point to an existing directory. The string is copied
   // internally; the caller's buffer need not outlive this constructor call.
@@ -38,8 +38,8 @@ class FileBackend final {
   // Non-owning, non-allocating visitor passed to ForEach.
   // fn must not be null. The callable and its context must outlive the Visitor.
   struct Visitor {
-    bool (*fn)(void* ctx, const char* key, const char* value);
-    void* ctx;
+    bool (*fn)(void* ctx, const char* key, const char* value); // NOLINT(misc-non-private-member-variables-in-classes) -- Visitor is a POD-like callback carrier; public members are intentional
+    void* ctx; // NOLINT(misc-non-private-member-variables-in-classes)
     bool operator()(const char* key, const char* value) const {
       return fn(ctx, key, value);
     }

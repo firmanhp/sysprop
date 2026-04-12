@@ -1,4 +1,4 @@
-// sysprop — System property store: C and C++ interface.
+// sysprop — System property store: C and C++ interface. // NOLINT(llvm-header-guard) -- #pragma once is used throughout; llvm-header-guard requires #ifndef-style guards
 //
 // A single header usable from both C and C++.
 //
@@ -40,7 +40,7 @@
 // Negative = error; 0 = success. Functions returning a byte count return a
 // positive value on success.
 
-#define SYSPROP_OK                    0
+#define SYSPROP_OK                    0 // NOLINT(cppcoreguidelines-macro-usage) -- must be a macro so the header stays valid C
 #define SYSPROP_ERR_NOT_FOUND        (-1)
 #define SYSPROP_ERR_READ_ONLY        (-2)
 #define SYSPROP_ERR_INVALID_KEY      (-3)
@@ -53,7 +53,7 @@
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
-typedef struct sysprop_config {
+typedef struct sysprop_config { // NOLINT(modernize-use-using) -- typedef struct is required for C compatibility; 'using' is C++ only
   const char* runtime_dir;     /* NULL → SYSPROP_RUNTIME_DIR    */
   const char* persistent_dir;  /* NULL → SYSPROP_PERSISTENT_DIR */
   int         enable_persistence; /* 0 = disabled, non-zero = enabled */

@@ -31,7 +31,7 @@ int ValidateKey(std::string_view key) noexcept {
 int ValidateValue(std::string_view value) noexcept {
   if (value.size() >= SYSPROP_MAX_VALUE_LENGTH) { return SYSPROP_ERR_VALUE_TOO_LONG; }
   // Values are stored as plain-text files; embedded nulls are not supported.
-  if (value.find('\0') != std::string_view::npos) { return SYSPROP_ERR_INVALID_KEY; }
+  if (value.find('\0') != std::string_view::npos) { return SYSPROP_ERR_INVALID_KEY; } // NOLINT(abseil-string-find-str-contains) -- no Abseil dependency in this project
   return SYSPROP_OK;
 }
 
