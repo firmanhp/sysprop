@@ -278,10 +278,10 @@ TEST_F(DefaultsLoaderTest, RoPropertyAlreadySetInStoreIsRejected) {
 
 // ── persist.* semantics ───────────────────────────────────────────────────────
 
-TEST_F(DefaultsLoaderTest, PersistPropertyWrittenToBothBackends) {
+TEST_F(DefaultsLoaderTest, PersistPropertyWrittenToPersistentOnly) {
   const auto f = WritePropFile("persist.wifi.ssid=HomeNet\n");
   ASSERT_EQ(1, LoadDefaultsFile(f.c_str(), *store_));
-  EXPECT_TRUE(FileExists(rt_dir_, "persist.wifi.ssid"));
+  EXPECT_FALSE(FileExists(rt_dir_, "persist.wifi.ssid"));
   EXPECT_TRUE(FileExists(ps_dir_, "persist.wifi.ssid"));
   EXPECT_EQ("HomeNet", Get("persist.wifi.ssid"));
 }

@@ -88,20 +88,23 @@ TEST_F(IntegrationTest, RoCannotBeDeleted) {
 
 // ── persist.* properties ─────────────────────────────────────────────────────
 
-TEST_F(IntegrationTest, PersistPropertyWrittenToRuntimeAndDisk) {
+TEST_F(IntegrationTest, PersistPropertyWrittenToDisk) {
   ASSERT_EQ(SYSPROP_OK, store_->Set("persist.wifi.ssid", "MyNet"));
 
   const int n = store_->Get("persist.wifi.ssid", buf_, sizeof(buf_));
   ASSERT_GE(n, 0);
   EXPECT_STREQ("MyNet", buf_);
 
-  // Verify the persistent backing file exists.
+  // Verify only the persistent backing file exists (not runtime).
   char ps_path[512];
   std::snprintf(ps_path, sizeof(ps_path), "%s/persist.wifi.ssid", ps_dir_.c_str());
   EXPECT_EQ(0, ::access(ps_path, F_OK)) << "Persistent file not found: " << ps_path;
+  char rt_path[512];
+  std::snprintf(rt_path, sizeof(rt_path), "%s/persist.wifi.ssid", rt_dir_.c_str());
+  EXPECT_NE(0, ::access(rt_path, F_OK)) << "Unexpected runtime file found: " << rt_path;
 }
 
-TEST_F(IntegrationTest, LoadPersistentPropertiesRestoresAfterReboot) {
+TEST_F(IntegrationTest, PersistPropertiesAccessibleAfterReboot) {
   ASSERT_EQ(SYSPROP_OK, store_->Set("persist.sys.timezone", "UTC"));
 
   // Simulate reboot: fresh runtime dir, same persistent dir.
@@ -113,10 +116,7 @@ TEST_F(IntegrationTest, LoadPersistentPropertiesRestoresAfterReboot) {
     FileBackend new_runtime{new_rt_dir.c_str()};
     PropertyStore new_store{&new_runtime, ps_backend_.get()};
 
-    EXPECT_EQ(SYSPROP_ERR_NOT_FOUND, new_store.Get("persist.sys.timezone", buf_, sizeof(buf_)));
-
-    EXPECT_GT(new_store.LoadPersistentProperties(), 0);
-
+    // persist.* reads directly from persistent_ — no LoadPersistentProperties needed.
     const int n = new_store.Get("persist.sys.timezone", buf_, sizeof(buf_));
     ASSERT_GE(n, 0);
     EXPECT_STREQ("UTC", buf_);
@@ -155,7 +155,7 @@ TEST_F(IntegrationTest, ForEachEarlyStop) {
 
 // ── Multiple persist props survive reboot ─────────────────────────────────────
 
-TEST_F(IntegrationTest, MultiplePersistPropsRestoreAfterReboot) {
+TEST_F(IntegrationTest, MultiplePersistPropsAccessibleAfterReboot) {
   ASSERT_EQ(SYSPROP_OK, store_->Set("persist.a", "1"));
   ASSERT_EQ(SYSPROP_OK, store_->Set("persist.b", "2"));
   ASSERT_EQ(SYSPROP_OK, store_->Set("persist.c", "3"));
@@ -167,7 +167,6 @@ TEST_F(IntegrationTest, MultiplePersistPropsRestoreAfterReboot) {
   {
     FileBackend new_runtime{new_rt_dir.c_str()};
     PropertyStore new_store{&new_runtime, ps_backend_.get()};
-    EXPECT_EQ(3, new_store.LoadPersistentProperties());
 
     for (const char* key : {"persist.a", "persist.b", "persist.c"}) {
       const int n = new_store.Get(key, buf_, sizeof(buf_));

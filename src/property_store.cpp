@@ -31,6 +31,9 @@ int PropertyStore::Get(const char* key, char* buf, std::size_t buf_len) {
   if (const int err = ValidateKey(key); err != SYSPROP_OK) {
     return err;
   }
+  if (persistent_ != nullptr && StartsWith(key, kPersistPrefix)) {
+    return persistent_->Get(key, buf, buf_len);
+  }
   return runtime_->Get(key, buf, buf_len);
 }
 
@@ -49,21 +52,11 @@ int PropertyStore::Set(const char* key, const char* value) {
     }
   }
 
-  if (const int rc = runtime_->Set(key, value); rc != SYSPROP_OK) {
-    return rc;
-  }
-
-  // persist.* properties are additionally written to the persistent store.
+  // persist.* properties live entirely in the persistent store.
   if (persistent_ != nullptr && StartsWith(key, kPersistPrefix)) {
-    if (const int prc = persistent_->Set(key, value); prc != SYSPROP_OK) {
-      // Non-fatal: log a warning but do not fail the overall Set — the runtime
-      // store is the source of truth.
-      (void)std::fprintf(stderr, "sysprop: warning: failed to persist property '%s' (err=%d)\n",
-                         key, prc);
-    }
+    return persistent_->Set(key, value);
   }
-
-  return SYSPROP_OK;
+  return runtime_->Set(key, value);
 }
 
 int PropertyStore::Delete(const char* key) {
@@ -75,24 +68,41 @@ int PropertyStore::Delete(const char* key) {
     return SYSPROP_ERR_READ_ONLY;
   }
 
-  const int rc = runtime_->Delete(key);
-
   if (persistent_ != nullptr && StartsWith(key, kPersistPrefix)) {
-    // Best-effort: explicitly discard the result — errors here are non-fatal.
-    (void)persistent_->Delete(key);
+    return persistent_->Delete(key);
   }
-
-  return rc;
+  return runtime_->Delete(key);
 }
 
 int PropertyStore::Exists(const char* key) {
   if (const int err = ValidateKey(key); err != SYSPROP_OK) {
     return err;
   }
+  if (persistent_ != nullptr && StartsWith(key, kPersistPrefix)) {
+    return persistent_->Exists(key);
+  }
   return runtime_->Exists(key);
 }
 
-int PropertyStore::ForEachImpl(FileBackend::Visitor visitor) { return runtime_->ForEach(visitor); }
+int PropertyStore::ForEachImpl(FileBackend::Visitor visitor) {
+  if (persistent_ == nullptr) {
+    return runtime_->ForEach(visitor);
+  }
+
+  // Iterate runtime first, tracking early stop, then persistent.
+  bool stopped = false;
+  auto track = [&](const char* k, const char* v) -> bool {
+    const bool cont = visitor(k, v);
+    if (!cont) stopped = true;
+    return cont;
+  };
+  auto tracking_visitor = MakeVisitor(track);
+
+  const int rc = runtime_->ForEach(tracking_visitor);
+  if (rc < 0 || stopped) return rc;
+
+  return persistent_->ForEach(visitor);
+}
 
 int PropertyStore::SetRuntimeOnly(const char* key, const char* value) {
   return runtime_->Set(key, value);
@@ -107,13 +117,17 @@ int PropertyStore::LoadPersistentProperties() {
   // Explicitly discard ForEach's return value: partial iteration failure is
   // non-fatal during boot-time property loading.
   auto fn = [&](const char* key, const char* value) {
+    // persist.* keys are accessed directly from persistent_; skip loading into runtime_.
+    if (StartsWith(key, kPersistPrefix)) {
+      return true;
+    }
     if (SetRuntimeOnly(key, value) == SYSPROP_OK) {
       ++load_count;
     } else {
       (void)std::fprintf(stderr, "sysprop: warning: failed to load persistent property '%s'\n",
                          key);
     }
-    return true;  // continue iteration
+    return true;
   };
   (void)persistent_->ForEach(MakeVisitor(fn));
 

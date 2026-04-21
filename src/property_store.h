@@ -11,9 +11,8 @@ namespace sysprop::internal {
 //
 // Policy rules:
 //   - ro.*     : can be set exactly once; subsequent sets return ERR_READ_ONLY.
-//   - persist.*: on set, written to both the runtime and persistent backends.
-//               LoadPersistentProperties() copies values from the persistent
-//               backend into the runtime backend (called at boot time).
+//   - persist.*: all operations go directly to the persistent backend (no
+//               runtime copy). Falls back to runtime if persistent is null.
 //   - Other    : volatile — only written to the runtime backend.
 //
 // All key and value inputs are validated before any backend operation.
@@ -28,7 +27,7 @@ class PropertyStore {
   [[nodiscard]] int Delete(const char* key);
   [[nodiscard]] int Exists(const char* key);
 
-  // Iterate over all runtime properties.
+  // Iterate over all properties (runtime and persistent).
   // Accepts any callable: ForEach([&](const char* key, const char* value) { ... });
   template <typename F>
   [[nodiscard]] int ForEach(F f) {
@@ -36,9 +35,11 @@ class PropertyStore {
     return ForEachImpl(v);
   }
 
-  // Load persisted properties from persistent_backend into runtime_backend.
+  // Load non-persist properties from persistent_backend into runtime_backend
+  // (e.g., factory-set ro.* keys). persist.* keys are skipped — they are
+  // accessed directly from persistent_backend at runtime.
   // No-op if persistent_backend is null. Returns the number of loaded
-  // properties on success, or a negative Error code.
+  // properties on success, or a negative error code.
   [[nodiscard]] int LoadPersistentProperties();
 
  private:

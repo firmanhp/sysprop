@@ -100,6 +100,18 @@ TEST_F(PropertyStoreTest, ForEachIteratesRuntimeProperties) {
   EXPECT_EQ(3, count);
 }
 
+TEST_F(PropertyStoreTest, ForEachIncludesPersistProperties) {
+  ASSERT_EQ(SYSPROP_OK, store_.Set("a.x", "1"));
+  ASSERT_EQ(SYSPROP_OK, store_.Set("persist.y", "2"));
+
+  int count = 0;
+  (void)store_.ForEach([&](const char*, const char*) {
+    ++count;
+    return true;
+  });
+  EXPECT_EQ(2, count);
+}
+
 TEST_F(PropertyStoreTest, ForEachEarlyStop) {
   ASSERT_EQ(SYSPROP_OK, store_.Set("a.x", "1"));
   ASSERT_EQ(SYSPROP_OK, store_.Set("b.y", "2"));
@@ -213,14 +225,14 @@ TEST_F(PropertyStoreTest, OverwriteMaxValueWithEmptyLeavesEmpty) {
 
 // ── persist.* attack scenarios ────────────────────────────────────────────────
 
-TEST_F(PropertyStoreTest, PersistDeleteAndRecreateUpdatesBothBackends) {
+TEST_F(PropertyStoreTest, PersistDeleteAndRecreateUpdatesBackend) {
   ASSERT_EQ(SYSPROP_OK, store_.Set("persist.cfg", "old"));
   ASSERT_EQ(SYSPROP_OK, store_.Delete("persist.cfg"));
   ASSERT_EQ(SYSPROP_OK, store_.Set("persist.cfg", "new"));
   const int n = store_.Get("persist.cfg", buf_, sizeof(buf_));
   ASSERT_GE(n, 0);
   EXPECT_STREQ("new", buf_);
-  EXPECT_TRUE(FileExists(rt_dir_, "persist.cfg"));
+  EXPECT_FALSE(FileExists(rt_dir_, "persist.cfg"));
   EXPECT_TRUE(FileExists(ps_dir_, "persist.cfg"));
 }
 
@@ -261,44 +273,54 @@ TEST_F(PropertyStoreTest, DeleteRoPropertyReturnsReadOnly) {
   EXPECT_TRUE(FileExists(rt_dir_, "ro.my.prop"));
 }
 
-// ── persist.* dual-write ──────────────────────────────────────────────────────
+// ── persist.* behavior ───────────────────────────────────────────────────────
 
-TEST_F(PropertyStoreTest, PersistPropertyWritesToBothBackends) {
+TEST_F(PropertyStoreTest, PersistPropertyWritesToPersistentOnly) {
   ASSERT_EQ(SYSPROP_OK, store_.Set("persist.wifi.ssid", "Home"));
-  EXPECT_TRUE(FileExists(rt_dir_, "persist.wifi.ssid"));
+  EXPECT_FALSE(FileExists(rt_dir_, "persist.wifi.ssid"));
   EXPECT_TRUE(FileExists(ps_dir_, "persist.wifi.ssid"));
 }
 
-TEST_F(PropertyStoreTest, PersistBackendFailureIsNonFatal) {
-  // Make the persistent dir unwritable so FileBackend::Set fails there.
-  ASSERT_EQ(0, ::chmod(ps_dir_.c_str(), 0555)) << strerror(errno);
-  EXPECT_EQ(SYSPROP_OK, store_.Set("persist.wifi.ssid", "Home"));
-  // Runtime must still have the value.
-  EXPECT_TRUE(FileExists(rt_dir_, "persist.wifi.ssid"));
-  (void)::chmod(ps_dir_.c_str(), 0755);  // restore for TearDown
+TEST_F(PropertyStoreTest, PersistGetReadFromPersistentBackend) {
+  ASSERT_EQ(SYSPROP_OK, store_.Set("persist.wifi.ssid", "Home"));
+  const int n = store_.Get("persist.wifi.ssid", buf_, sizeof(buf_));
+  ASSERT_GE(n, 0);
+  EXPECT_STREQ("Home", buf_);
 }
 
-TEST_F(PropertyStoreTest, PersistDeleteCascadesToPersistentBackend) {
+TEST_F(PropertyStoreTest, PersistBackendFailureFailsSet) {
+  if (::getuid() == 0) {
+    GTEST_SKIP() << "root bypasses permission checks";
+  }
+  ASSERT_EQ(0, ::chmod(ps_dir_.c_str(), 0555)) << strerror(errno);
+  EXPECT_NE(SYSPROP_OK, store_.Set("persist.wifi.ssid", "Home"));
+  EXPECT_FALSE(FileExists(rt_dir_, "persist.wifi.ssid"));
+  (void)::chmod(ps_dir_.c_str(), 0755);
+}
+
+TEST_F(PropertyStoreTest, PersistDeleteRemovesFromPersistentBackend) {
   ASSERT_EQ(SYSPROP_OK, store_.Set("persist.wifi.ssid", "Home"));
   ASSERT_EQ(SYSPROP_OK, store_.Delete("persist.wifi.ssid"));
   EXPECT_FALSE(FileExists(rt_dir_, "persist.wifi.ssid"));
   EXPECT_FALSE(FileExists(ps_dir_, "persist.wifi.ssid"));
+  EXPECT_EQ(SYSPROP_ERR_NOT_FOUND, store_.Get("persist.wifi.ssid", buf_, sizeof(buf_)));
 }
 
-// Delete of persist.* when persistent backend delete fails: runtime delete
-// still succeeds, so SYSPROP_OK is returned (persistent error is discarded).
-TEST_F(PropertyStoreTest, PersistDeletePersistentFailureReturnsOk) {
+TEST_F(PropertyStoreTest, PersistDeletePersistentFailureReturnsError) {
   if (::getuid() == 0) {
     GTEST_SKIP() << "root bypasses permission checks";
   }
   ASSERT_EQ(SYSPROP_OK, store_.Set("persist.wifi.ssid", "Home"));
-  // Make the persistent dir unwritable so Delete fails there.
   ASSERT_EQ(0, ::chmod(ps_dir_.c_str(), 0555)) << strerror(errno);
-  // Runtime delete still succeeds → overall return is SYSPROP_OK.
-  EXPECT_EQ(SYSPROP_OK, store_.Delete("persist.wifi.ssid"));
-  EXPECT_FALSE(FileExists(rt_dir_, "persist.wifi.ssid"));
-  // Persistent file could not be removed; that's acceptable.
+  EXPECT_NE(SYSPROP_OK, store_.Delete("persist.wifi.ssid"));
   ::chmod(ps_dir_.c_str(), 0755);
+}
+
+TEST_F(PropertyStoreTest, PersistExistsChecksPeristentBackend) {
+  EXPECT_EQ(SYSPROP_ERR_NOT_FOUND, store_.Exists("persist.wifi.ssid"));
+  ASSERT_EQ(SYSPROP_OK, store_.Set("persist.wifi.ssid", "Home"));
+  EXPECT_EQ(SYSPROP_OK, store_.Exists("persist.wifi.ssid"));
+  EXPECT_EQ(SYSPROP_ERR_NOT_FOUND, store_.Exists("persist.missing"));
 }
 
 TEST_F(PropertyStoreTest, NoPersistentBackendStillWorks) {
@@ -315,19 +337,22 @@ TEST_F(PropertyStoreTest, LoadPersistentPropertiesIsNoopWithoutPersistentBackend
   EXPECT_EQ(0, no_ps.LoadPersistentProperties());
 }
 
-TEST_F(PropertyStoreTest, LoadPersistentPropertiesPopulatesRuntime) {
-  // Pre-populate the persistent dir directly via ps_backend_.
+TEST_F(PropertyStoreTest, PersistPropertiesAccessibleWithoutLoading) {
+  // persist.* keys written directly to ps_backend_ are accessible immediately —
+  // no LoadPersistentProperties() call required.
   ASSERT_EQ(SYSPROP_OK, ps_backend_.Set("persist.a", "1"));
   ASSERT_EQ(SYSPROP_OK, ps_backend_.Set("persist.b", "2"));
-
-  // Fresh runtime dir — nothing loaded yet.
-  EXPECT_EQ(SYSPROP_ERR_NOT_FOUND, store_.Get("persist.a", buf_, sizeof(buf_)));
-
-  EXPECT_EQ(2, store_.LoadPersistentProperties());
 
   const int n = store_.Get("persist.a", buf_, sizeof(buf_));
   ASSERT_GE(n, 0);
   EXPECT_STREQ("1", buf_);
+}
+
+TEST_F(PropertyStoreTest, LoadPersistentPropertiesSkipsPersistKeys) {
+  // persist.* keys in persistent_ are skipped by LoadPersistentProperties since
+  // they are accessed directly; only non-persist keys (e.g. ro.*) are loaded.
+  ASSERT_EQ(SYSPROP_OK, ps_backend_.Set("persist.a", "1"));
+  EXPECT_EQ(0, store_.LoadPersistentProperties());
 }
 
 // ── ForEach error propagation ─────────────────────────────────────────────────
