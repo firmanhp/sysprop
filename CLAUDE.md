@@ -6,7 +6,7 @@ Always use the scripts, not raw cmake/ctest:
 
 ```bash
 scripts/build.sh              # build library + CLI tools
-scripts/test.sh               # build + run full test suite (244 tests)
+scripts/test.sh               # build + run full test suite (239 tests)
 scripts/test.sh -R FileBackend  # run only tests matching a pattern
 scripts/benchmark.sh          # build + run benchmarks
 scripts/lint.sh               # run clang-tidy on src/ only
@@ -19,7 +19,7 @@ Build output: `build/src/libsysprop.a`, `build/tools/sysprop`, `build/tools/sysp
 Internal layers in `src/` (not part of the public API):
 
 ```
-include/sysprop/sysprop.h               ← public C API (sysprop_get/set/delete/init)
+include/sysprop/sysprop.h               ← public C API (sysprop_get/set/delete and typed helpers)
 include/sysprop/property_store.h        ← abstract PropertyStore interface
 include/sysprop/testing/internal.h      ← swap_store() for test injection
 include/sysprop/testing/mock_property_store.h  ← MockPropertyStore: in-memory mock, RAII injection
@@ -39,7 +39,7 @@ src/validation.cpp/h                    ← key/value validation only
 
 **No heap on hot paths.** `Get`/`Set` use stack buffers only. `snprintf` into `char[]` for path construction, never `std::string`.
 
-**Placement-new singleton.** `sysprop_init()` constructs `GlobalStore` into `alignas`-aligned static storage via placement-new. `GetStore()` returns `nullptr` until initialized — all API functions check this and return `SYSPROP_ERR_NOT_INITIALIZED`. No `std::call_once`, no `__cxa_guard_*`. `sysprop_init()` is called once from `main()` before threads start; no internal thread-safety is needed.
+**Placement-new auto-init singleton.** `__attribute__((constructor))` constructs `GlobalStore` into `alignas`-aligned static storage via placement-new before `main()` runs. No `std::call_once`, no `__cxa_guard_*`, no explicit init call required. Directories and persistence are baked in at CMake configure time via `SYSPROP_RUNTIME_DIR`, `SYSPROP_PERSISTENT_DIR`, and `SYSPROP_ENABLE_PERSISTENCE` cache variables.
 
 **Atomic writes via `rename(2)`.** `FileBackend::Set` writes to `.tmp.<key>.<pid>` then renames. `rename` atomically replaces even pre-existing symlinks (it replaces the directory entry, not the target). This is a security property — do not change the write path.
 
@@ -69,7 +69,7 @@ Test files and what they cover:
 - `sysprop_main_test.cpp` — CLI commands: `DoList`, `CmdGetprop`, `CmdSetprop`, `CmdDelete`
 - `sysprop_init_helpers_test.cpp` — `MkdirP`, `CleanupTmpFiles`, `ParseInitArgs`
 
-`GlobalApiTest` uses `SetUpTestSuite` (static) because the singleton can only be initialized once per process. Each test uses a unique key prefix to avoid cross-test interference.
+`GlobalApiTest` uses `SetUpTestSuite`/`TearDownTestSuite` (static) to inject a real `FilePropertyStore` (backed by `mkdtemp` dirs) via `swap_store()`, because the singleton auto-inits to the compiled-in dirs which are not writable in the test environment. Each test uses a unique key prefix to avoid cross-test interference.
 
 ## Clang-Tidy
 

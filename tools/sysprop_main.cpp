@@ -31,8 +31,14 @@ const char* ProgName(const char* argv0) noexcept {
   return p != nullptr ? p + 1 : argv0;
 }
 
-sysprop_config_t ConfigFromEnv() {
-  sysprop_config_t cfg{SYSPROP_RUNTIME_DIR, SYSPROP_PERSISTENT_DIR, 1};
+struct ToolConfig {
+  const char* runtime_dir    = SYSPROP_RUNTIME_DIR;
+  const char* persistent_dir = SYSPROP_PERSISTENT_DIR;
+  bool enable_persistence    = true;
+};
+
+ToolConfig ConfigFromEnv() {
+  ToolConfig cfg;
   if (const char* rd = std::getenv("SYSPROP_RUNTIME_DIR")) {
     cfg.runtime_dir = rd;
   }
@@ -62,7 +68,7 @@ void PrintUsage(const char* prog) {
 
 int main(int argc, char* argv[]) {
   const char* prog = ProgName(argv[0]);
-  const sysprop_config_t cfg = ConfigFromEnv();
+  const ToolConfig cfg = ConfigFromEnv();
 
   // Construct backends directly rather than using the global singleton so that
   // environment-variable overrides take effect per invocation.

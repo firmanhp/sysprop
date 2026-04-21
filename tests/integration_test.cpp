@@ -8,15 +8,18 @@
 #include <gtest/gtest.h>
 #include <sys/stat.h>
 #include <sysprop/sysprop.h>
+#include <sysprop/testing/internal.h>
 
 // Integration tests exercise FilePropertyStore + FileBackend directly rather than
-// the global singleton (which is initialised once via call_once and cannot be
-// reset between tests).
+// the global singleton (which auto-inits to the compiled-in dirs, not writable in
+// the test environment). GlobalApiTest injects a FilePropertyStore (backed by
+// mkdtemp dirs) via swap_store() for the duration of the suite.
 #include "file_backend.h"
 #include "file_property_store.h"
 
 using sysprop::internal::FileBackend;
 using sysprop::internal::FilePropertyStore;
+using sysprop::testing::swap_store;
 
 // ── Fixture ───────────────────────────────────────────────────────────────────
 
@@ -280,7 +283,6 @@ TEST(ErrorString, CoversAllCodes) {
   EXPECT_STREQ("key too long", sysprop_error_string(SYSPROP_ERR_KEY_TOO_LONG));
   EXPECT_STREQ("I/O error", sysprop_error_string(SYSPROP_ERR_IO));
   EXPECT_STREQ("permission denied", sysprop_error_string(SYSPROP_ERR_PERMISSION));
-  EXPECT_STREQ("not initialized", sysprop_error_string(SYSPROP_ERR_NOT_INITIALIZED));
   EXPECT_STREQ("buffer too small", sysprop_error_string(SYSPROP_ERR_BUFFER_TOO_SMALL));
   EXPECT_STREQ("unknown error", sysprop_error_string(-999));
 }
@@ -296,19 +298,38 @@ class GlobalApiTest : public ::testing::Test {
   static void SetUpTestSuite() {
     std::string rt = testing::TempDir() + "sysprop_gapi_rt_XXXXXX";
     std::string ps = testing::TempDir() + "sysprop_gapi_ps_XXXXXX";
-    rt_dir_ = ::mkdtemp(rt.data());
-    ps_dir_ = ::mkdtemp(ps.data());
-    sysprop_config_t cfg{rt_dir_.c_str(), ps_dir_.c_str(), 1};
-    (void)sysprop_init(&cfg);
+    ASSERT_NE(::mkdtemp(rt.data()), nullptr);
+    ASSERT_NE(::mkdtemp(ps.data()), nullptr);
+    rt_dir_ = rt;
+    ps_dir_ = ps;
+    rt_backend_  = std::make_unique<FileBackend>(rt_dir_.c_str());
+    ps_backend_  = std::make_unique<FileBackend>(ps_dir_.c_str());
+    suite_store_ = std::make_unique<FilePropertyStore>(rt_backend_.get(), ps_backend_.get());
+    prev_store_  = swap_store(suite_store_.get());
+  }
+
+  static void TearDownTestSuite() {
+    swap_store(prev_store_);
+    suite_store_.reset();
+    ps_backend_.reset();
+    rt_backend_.reset();
   }
 
   static std::string rt_dir_;
   static std::string ps_dir_;
+  static std::unique_ptr<FileBackend> rt_backend_;
+  static std::unique_ptr<FileBackend> ps_backend_;
+  static std::unique_ptr<FilePropertyStore> suite_store_;
+  static sysprop::internal::PropertyStore* prev_store_;
   char buf_[SYSPROP_MAX_VALUE_LENGTH] = {};
 };
 
 std::string GlobalApiTest::rt_dir_;
 std::string GlobalApiTest::ps_dir_;
+std::unique_ptr<FileBackend> GlobalApiTest::rt_backend_;
+std::unique_ptr<FileBackend> GlobalApiTest::ps_backend_;
+std::unique_ptr<FilePropertyStore> GlobalApiTest::suite_store_;
+sysprop::internal::PropertyStore* GlobalApiTest::prev_store_ = nullptr;
 
 TEST_F(GlobalApiTest, SetAndGet) {
   ASSERT_EQ(SYSPROP_OK, sysprop_set("gapi.hello", "world"));
@@ -322,18 +343,6 @@ TEST_F(GlobalApiTest, DeleteRemovesKey) {
   EXPECT_EQ(SYSPROP_ERR_NOT_FOUND, sysprop_get("gapi.del", buf_, sizeof(buf_)));
 }
 
-TEST_F(GlobalApiTest, InitIsIdempotent) {
-  ASSERT_EQ(SYSPROP_OK, sysprop_set("gapi.idempotent", "yes"));
-
-  // Second init with different dirs must be silently ignored.
-  const std::string tmp = testing::TempDir();
-  sysprop_config_t other{tmp.c_str(), tmp.c_str(), 0};
-  EXPECT_EQ(SYSPROP_OK, sysprop_init(&other));
-
-  // Key set before second init must still be reachable (store not replaced).
-  ASSERT_GE(sysprop_get("gapi.idempotent", buf_, sizeof(buf_)), 0);
-  EXPECT_STREQ("yes", buf_);
-}
 
 TEST_F(GlobalApiTest, GetWithBufLen1ReturnsEmpty) {
   ASSERT_EQ(SYSPROP_OK, sysprop_set("gapi.bufone", "hello"));
@@ -485,28 +494,6 @@ TEST_F(GlobalApiTest, GetBoolLeadingWhitespaceReturnsDefault) {
   EXPECT_EQ(1, sysprop_get_bool("gapi.bool.ws", 1));
 }
 
-// ── Uninitialized C API ───────────────────────────────────────────────────────
-//
-// These tests intentionally do NOT call sysprop_init(). Because ctest runs each
-// test via --gtest_filter in its own process, the placement-new singleton is
-// never constructed and GetStore() returns nullptr.
-
-TEST(UninitializedApi, GetReturnsNotInitialized) {
-  char buf[SYSPROP_MAX_VALUE_LENGTH];
-  EXPECT_EQ(SYSPROP_ERR_NOT_INITIALIZED, sysprop_get("any.key", buf, sizeof(buf)));
-}
-
-TEST(UninitializedApi, SetReturnsNotInitialized) {
-  EXPECT_EQ(SYSPROP_ERR_NOT_INITIALIZED, sysprop_set("any.key", "value"));
-}
-
-TEST(UninitializedApi, DeleteReturnsNotInitialized) {
-  EXPECT_EQ(SYSPROP_ERR_NOT_INITIALIZED, sysprop_delete("any.key"));
-}
-
-// sysprop_init(nullptr) uses compiled-in defaults; must not crash or fail.
-TEST(UninitializedApi, InitWithNullptrSucceeds) { EXPECT_EQ(SYSPROP_OK, sysprop_init(nullptr)); }
-
 // ── C API: delete nonexistent key ─────────────────────────────────────────────
 
 TEST_F(GlobalApiTest, DeleteNonexistentKeyReturnsNotFound) {
@@ -524,8 +511,7 @@ TEST_F(GlobalApiTest, CppGetReturnsDefaultWhenMissing) {
   EXPECT_EQ("fallback", sysprop_get("cpp.get.missing", std::string("fallback")));
 }
 
-TEST_F(GlobalApiTest, CppGetReturnsDefaultWhenUninitialized) {
+TEST_F(GlobalApiTest, CppGetReturnsDefaultForInvalidKey) {
   // The overload must propagate the error from the C layer and return the default.
-  // (Singleton is initialized in this suite, so exercise via an invalid key instead.)
   EXPECT_EQ("def", sysprop_get("", std::string("def")));
 }

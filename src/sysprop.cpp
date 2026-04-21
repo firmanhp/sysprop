@@ -20,26 +20,27 @@ using sysprop::internal::PropertyStore;
 
 // ── Global singleton ──────────────────────────────────────────────────────────
 //
-// Constructed once by sysprop_init() into static storage (no heap). Until
-// sysprop_init() is called, s_instance is null and all API calls return
-// SYSPROP_ERR_NOT_INITIALIZED.
+// Constructed once via __attribute__((constructor)) before main() runs.
+// Directories and persistence are baked in at compile time via CMake.
+// GetStore() still null-checks for safety, but in normal usage s_instance
+// is always set before any C function executes.
 //
-// Thread safety: sysprop_init() is expected to be called from main() before
-// any threads are started. Concurrent property access after init is safe
-// because FileBackend operations are individually atomic (rename(2)).
+// Thread safety: the constructor attribute runs before any threads are started.
+// Concurrent property access after init is safe because FileBackend operations
+// are individually atomic (rename(2)).
 
 struct GlobalStore {
-  explicit GlobalStore(const sysprop_config_t* cfg)
-      : runtime_{(cfg && cfg->runtime_dir) ? cfg->runtime_dir : SYSPROP_RUNTIME_DIR},
-        persistent_{MakePersistent(cfg)},
+  GlobalStore()
+      : runtime_{SYSPROP_RUNTIME_DIR},
+        persistent_{MakePersistent()},
         store_{&runtime_, persistent_ ? &*persistent_ : nullptr} {}
 
-  static std::optional<FileBackend> MakePersistent(const sysprop_config_t* cfg) {
-    if ((cfg == nullptr) || (cfg->enable_persistence != 0)) {
-      return FileBackend{(cfg && cfg->persistent_dir) ? cfg->persistent_dir
-                                                      : SYSPROP_PERSISTENT_DIR};
-    }
+  static std::optional<FileBackend> MakePersistent() {
+#if SYSPROP_ENABLE_PERSISTENCE
+    return FileBackend{SYSPROP_PERSISTENT_DIR};
+#else
     return std::nullopt;
+#endif
   }
 
   FileBackend runtime_;  // NOLINT(misc-non-private-member-variables-in-classes) -- GlobalStore is
@@ -49,13 +50,13 @@ struct GlobalStore {
 };
 
 // Raw storage avoids any static-initializer or atexit registration.
-// Placement-new'd by sysprop_init(); never explicitly destructed (lifetime
+// Placement-new'd by sysprop_auto_init(); never explicitly destructed (lifetime
 // matches the process — the OS reclaims on exit).
 alignas(GlobalStore) static unsigned char s_storage[sizeof(
     GlobalStore)];  // NOLINT(cppcoreguidelines-avoid-non-const-global-variables,readability-static-definition-in-anonymous-namespace)
                     // -- placement-new singleton buffer; intentionally non-const and file-scoped
 static GlobalStore* s_instance = nullptr;  // NOLINT(cppcoreguidelines-avoid-non-const-global-variables,readability-static-definition-in-anonymous-namespace)
-                                           // -- singleton pointer; null until sysprop_init()
+                                           // -- singleton pointer; null until sysprop_auto_init()
 
 // Test-injection override. When non-null, GetStore() returns this instead of
 // the singleton's FilePropertyStore. Set/cleared by swap_store().
@@ -64,6 +65,12 @@ static PropertyStore* s_store_override = nullptr;  // NOLINT(cppcoreguidelines-a
 PropertyStore* GetStore() {
   if (s_store_override != nullptr) { return s_store_override; }
   return s_instance ? &s_instance->store_ : nullptr;
+}
+
+__attribute__((constructor))
+void sysprop_auto_init() {
+  if (s_instance) { return; }  // guard: safe if ever used as a shared library
+  s_instance = new (s_storage) GlobalStore{};  // NOLINT(cppcoreguidelines-owning-memory) -- placement new into static storage; no heap allocation
 }
 
 }  // namespace
@@ -90,8 +97,6 @@ const char* sysprop_error_string(int err) {
       return "I/O error";
     case SYSPROP_ERR_PERMISSION:
       return "permission denied";
-    case SYSPROP_ERR_NOT_INITIALIZED:
-      return "not initialized";
     case SYSPROP_ERR_BUFFER_TOO_SMALL:
       return "buffer too small";
     default:
@@ -99,44 +104,21 @@ const char* sysprop_error_string(int err) {
   }
 }
 
-int sysprop_init(const sysprop_config_t* config) {
-  if (s_instance) {
-    return SYSPROP_OK;
-  }  // already initialized; ignore
-  s_instance = new (s_storage)
-      GlobalStore{config};  // NOLINT(cppcoreguidelines-owning-memory) -- placement new into static
-                            // storage; no heap allocation, ownership concept does not apply
-  return SYSPROP_OK;
-}
-
 int sysprop_get(const char* key, char* buf, size_t buf_len) {
-  PropertyStore* s = GetStore();
-  if (!s) {
-    return SYSPROP_ERR_NOT_INITIALIZED;
-  }
-  return s->Get(key, buf, buf_len);
+  return GetStore()->Get(key, buf, buf_len);
 }
 
 int sysprop_set(const char* key, const char* value) {
-  PropertyStore* s = GetStore();
-  if (!s) {
-    return SYSPROP_ERR_NOT_INITIALIZED;
-  }
-  return s->Set(key, value);
+  return GetStore()->Set(key, value);
 }
 
 int sysprop_delete(const char* key) {
-  PropertyStore* s = GetStore();
-  if (!s) {
-    return SYSPROP_ERR_NOT_INITIALIZED;
-  }
-  return s->Delete(key);
+  return GetStore()->Delete(key);
 }
 
 int sysprop_get_int(const char* key, int default_value) {
   char buf[SYSPROP_MAX_VALUE_LENGTH];
-  PropertyStore* s = GetStore();
-  if (!s || s->Get(key, buf, sizeof(buf)) < 0) {
+  if (GetStore()->Get(key, buf, sizeof(buf)) < 0) {
     return default_value;
   }
 
@@ -153,8 +135,7 @@ int sysprop_get_int(const char* key, int default_value) {
 
 int sysprop_get_bool(const char* key, int default_value) {
   char buf[SYSPROP_MAX_VALUE_LENGTH];
-  PropertyStore* s = GetStore();
-  if (!s || s->Get(key, buf, sizeof(buf)) < 0) {
+  if (GetStore()->Get(key, buf, sizeof(buf)) < 0) {
     return default_value ? 1 : 0;
   }
 
@@ -170,8 +151,7 @@ int sysprop_get_bool(const char* key, int default_value) {
 
 float sysprop_get_float(const char* key, float default_value) {
   char buf[SYSPROP_MAX_VALUE_LENGTH];
-  PropertyStore* s = GetStore();
-  if (!s || s->Get(key, buf, sizeof(buf)) < 0) {
+  if (GetStore()->Get(key, buf, sizeof(buf)) < 0) {
     return default_value;
   }
 

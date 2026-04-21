@@ -19,8 +19,8 @@
 #endif
 
 // ── Configurable compile-time defaults ────────────────────────────────────────
-// Override by passing -DSYSPROP_RUNTIME_DIR="..." at compile time or via the
-// CMake cache variable of the same name.
+// Compile-time defaults. Override via CMake cache (-DSYSPROP_RUNTIME_DIR="...").
+// The library auto-initializes using these values before main() runs.
 
 #ifndef SYSPROP_RUNTIME_DIR
 #  define SYSPROP_RUNTIME_DIR "/run/sysprop/props"
@@ -49,18 +49,12 @@
 #define SYSPROP_ERR_KEY_TOO_LONG     (-5)
 #define SYSPROP_ERR_IO               (-6)
 #define SYSPROP_ERR_PERMISSION       (-7)
-#define SYSPROP_ERR_NOT_INITIALIZED  (-8)
 #define SYSPROP_ERR_BUFFER_TOO_SMALL (-9)
 
-// ── Config ────────────────────────────────────────────────────────────────────
-
-typedef struct sysprop_config { // NOLINT(modernize-use-using) -- typedef struct is required for C compatibility; 'using' is C++ only
-  const char* runtime_dir;     /* NULL → SYSPROP_RUNTIME_DIR    */
-  const char* persistent_dir;  /* NULL → SYSPROP_PERSISTENT_DIR */
-  int         enable_persistence; /* 0 = disabled, non-zero = enabled */
-} sysprop_config_t;
-
 // ── API ───────────────────────────────────────────────────────────────────────
+//
+// The library auto-initializes via __attribute__((constructor)) before main()
+// runs. No explicit init call is required.
 
 #ifdef __cplusplus
 extern "C" {
@@ -68,12 +62,6 @@ extern "C" {
 
 // Returns a human-readable string for an error code.
 const char* sysprop_error_string(int err);
-
-// Initialize the library with the given config.
-// Pass NULL to use compiled-in defaults.
-// Safe to call multiple times; only the first call takes effect.
-// Returns SYSPROP_OK or a negative error code.
-int sysprop_init(const sysprop_config_t* config);
 
 // Read the value of key into the caller-provided buffer.
 // buf is always null-terminated on success when buf_len > 0.
