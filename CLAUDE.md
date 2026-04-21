@@ -6,7 +6,7 @@ Always use the scripts, not raw cmake/ctest:
 
 ```bash
 scripts/build.sh              # build library + CLI tools
-scripts/test.sh               # build + run full test suite (130 tests)
+scripts/test.sh               # build + run full test suite (244 tests)
 scripts/test.sh -R FileBackend  # run only tests matching a pattern
 scripts/benchmark.sh          # build + run benchmarks
 scripts/lint.sh               # run clang-tidy on src/ only
@@ -16,21 +16,24 @@ Build output: `build/src/libsysprop.a`, `build/tools/sysprop`, `build/tools/sysp
 
 ## Architecture
 
-Three internal layers, all in `src/` (not part of the public API):
+Internal layers in `src/` (not part of the public API):
 
 ```
-include/sysprop/sysprop.h   ← public C API (sysprop_get/set/delete/init)
-src/sysprop.cpp             ← global singleton, typed helpers (get_int/bool/float)
-src/property_store.cpp/h    ← policy: ro.* immutability, persist.* dual-write
-src/file_backend.cpp/h      ← raw POSIX I/O: open/read/write/rename/unlink
-src/validation.cpp/h        ← key/value validation only
+include/sysprop/sysprop.h      ← public C API (sysprop_get/set/delete/init)
+src/sysprop.cpp                ← global singleton, typed helpers (get_int/bool/float)
+src/property_store.h           ← abstract PropertyStore interface
+src/file_property_store.cpp/h  ← FilePropertyStore: policy (ro.*, persist.*) + FileBackend
+src/mock_property_store.h      ← MockPropertyStore: in-memory mock, RAII injection
+src/sysprop_internal.h         ← swap_store() for test injection
+src/file_backend.cpp/h         ← raw POSIX I/O: open/read/write/rename/unlink
+src/validation.cpp/h           ← key/value validation only
 ```
 
-`backend.h` does **not** exist — there is no abstract backend interface. `PropertyStore` takes `FileBackend*` directly. This was a deliberate decision to eliminate vtable overhead.
+`FileBackend` is `final` with no virtual interface — `FilePropertyStore` holds `FileBackend*` directly, eliminating vtable overhead on the I/O path. `PropertyStore` is an abstract interface; one vtable dispatch occurs at the policy layer but property access is not a tight hot path.
 
 ## Key Design Decisions
 
-**No vtable.** `FileBackend` is `final`, `PropertyStore` holds `FileBackend*` directly. Do not introduce `virtual` or abstract base classes.
+**Vtable at policy layer only.** `FileBackend` is `final`; `FilePropertyStore` holds `FileBackend*` directly (no vtable on hot I/O path). `PropertyStore` is an abstract interface for `FilePropertyStore` (filesystem) and `MockPropertyStore` (in-memory). Do not introduce vtables below `FilePropertyStore`.
 
 **No exceptions.** `-fno-exceptions` is set in `CMakeLists.txt`. All error paths use integer return codes (`SYSPROP_OK = 0`, negative values for errors). Never use `throw`.
 
@@ -44,7 +47,7 @@ src/validation.cpp/h        ← key/value validation only
 
 **`ro.*` policy uses `Exists()` check**, not filesystem permissions. Bare `ro` (no dot) is mutable. Only keys starting with `"ro."` are read-only.
 
-**`persist.*` dual-write failure is non-fatal.** Runtime backend is source of truth; persistent backend failure logs a warning to stderr but `Set` still returns `SYSPROP_OK`.
+**`persist.*` operations go directly to persistent backend.** Get/Set/Delete/Exists for `persist.*` keys bypass the runtime backend entirely. If no persistent backend is configured, operations fall back to runtime. `LoadPersistentProperties()` skips `persist.*` keys (accessed directly) but loads other persistent keys (e.g. factory `ro.*`) into runtime.
 
 ## Public API Conventions
 
@@ -54,12 +57,13 @@ src/validation.cpp/h        ← key/value validation only
 
 ## Testing
 
-Tests use real `FileBackend` + `mkdtemp`-created temp dirs. There are no mocks. GoogleTest's `testing::TempDir()` is used as the base for all temp directory templates — never hardcode `/tmp`.
+Most tests use real `FileBackend` + `mkdtemp`-created temp dirs. `MockPropertyStore` is available for tests that need in-memory injection without filesystem I/O. GoogleTest's `testing::TempDir()` is used as the base for all temp directory templates — never hardcode `/tmp`.
 
 Test files and what they cover:
 - `validation_test.cpp` — `ValidateKey` / `ValidateValue` only; no I/O
 - `file_backend_test.cpp` — raw storage, atomicity, concurrency, filesystem attacks
-- `property_store_test.cpp` — policy enforcement (ro, persist, validation delegation)
+- `file_property_store_test.cpp` — policy enforcement (ro, persist, validation delegation)
+- `mock_property_store_test.cpp` — in-memory mock: direct usage and RAII injection into `sysprop_xxx()` API
 - `integration_test.cpp` — end-to-end through the C API; includes `GlobalApiTest` (singleton, typed helpers) and evil-attacker scenarios
 - `sysprop_init_test.cpp` — `LoadDefaultsFile` (build.prop parsing, validation, ro/persist semantics)
 - `sysprop_main_test.cpp` — CLI commands: `DoList`, `CmdGetprop`, `CmdSetprop`, `CmdDelete`

@@ -23,7 +23,7 @@ done < <(
 
 SRC_FILES=(
   "$REPO_ROOT"/src/file_backend.cpp
-  "$REPO_ROOT"/src/property_store.cpp
+  "$REPO_ROOT"/src/file_property_store.cpp
   "$REPO_ROOT"/src/sysprop.cpp
   "$REPO_ROOT"/src/validation.cpp
 )
