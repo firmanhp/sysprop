@@ -513,3 +513,20 @@ TEST(UninitializedApi, InitWithNullptrSucceeds) { EXPECT_EQ(SYSPROP_OK, sysprop_
 TEST_F(GlobalApiTest, DeleteNonexistentKeyReturnsNotFound) {
   EXPECT_EQ(SYSPROP_ERR_NOT_FOUND, sysprop_delete("no.such.delete.key"));
 }
+
+// ── C++ std::string overload ──────────────────────────────────────────────────
+
+TEST_F(GlobalApiTest, CppGetReturnsValue) {
+  ASSERT_EQ(SYSPROP_OK, sysprop_set("cpp.get.value", "hello"));
+  EXPECT_EQ("hello", sysprop_get("cpp.get.value", std::string("default")));
+}
+
+TEST_F(GlobalApiTest, CppGetReturnsDefaultWhenMissing) {
+  EXPECT_EQ("fallback", sysprop_get("cpp.get.missing", std::string("fallback")));
+}
+
+TEST_F(GlobalApiTest, CppGetReturnsDefaultWhenUninitialized) {
+  // The overload must propagate the error from the C layer and return the default.
+  // (Singleton is initialized in this suite, so exercise via an invalid key instead.)
+  EXPECT_EQ("def", sysprop_get("", std::string("def")));
+}

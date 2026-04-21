@@ -13,6 +13,7 @@
 
 #ifdef __cplusplus
 #  include <cstddef>
+#  include <string>
 #else
 #  include <stddef.h>
 #endif
@@ -93,4 +94,13 @@ float sysprop_get_float(const char* key, float default_value);
 #ifdef __cplusplus
 }  // extern "C"
 #endif
+
+#ifdef __cplusplus
+inline std::string sysprop_get(const char* key, std::string default_value) {
+    char buf[SYSPROP_MAX_VALUE_LENGTH];
+    int n = ::sysprop_get(key, buf, sizeof(buf));
+    if (n < 0) { return default_value; }
+    return std::string(buf, static_cast<std::string::size_type>(n));
+}
+#endif  // __cplusplus
 
