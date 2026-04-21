@@ -8,7 +8,7 @@
 
 #include <sysprop/sysprop.h>
 
-#include "property_store.h"
+#include <sysprop/property_store.h>
 
 namespace sysprop::tools {
 

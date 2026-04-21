@@ -19,14 +19,14 @@ Build output: `build/src/libsysprop.a`, `build/tools/sysprop`, `build/tools/sysp
 Internal layers in `src/` (not part of the public API):
 
 ```
-include/sysprop/sysprop.h      ← public C API (sysprop_get/set/delete/init)
-src/sysprop.cpp                ← global singleton, typed helpers (get_int/bool/float)
-src/property_store.h           ← abstract PropertyStore interface
-src/file_property_store.cpp/h  ← FilePropertyStore: policy (ro.*, persist.*) + FileBackend
-src/mock_property_store.h      ← MockPropertyStore: in-memory mock, RAII injection
-src/sysprop_internal.h         ← swap_store() for test injection
-src/file_backend.cpp/h         ← raw POSIX I/O: open/read/write/rename/unlink
-src/validation.cpp/h           ← key/value validation only
+include/sysprop/sysprop.h               ← public C API (sysprop_get/set/delete/init)
+include/sysprop/property_store.h        ← abstract PropertyStore interface
+include/sysprop/testing/internal.h      ← swap_store() for test injection
+include/sysprop/testing/mock_property_store.h  ← MockPropertyStore: in-memory mock, RAII injection
+src/sysprop.cpp                         ← global singleton, typed helpers (get_int/bool/float)
+src/file_property_store.cpp/h           ← FilePropertyStore: policy (ro.*, persist.*) + FileBackend
+src/file_backend.cpp/h                  ← raw POSIX I/O: open/read/write/rename/unlink
+src/validation.cpp/h                    ← key/value validation only
 ```
 
 `FileBackend` is `final` with no virtual interface — `FilePropertyStore` holds `FileBackend*` directly, eliminating vtable overhead on the I/O path. `PropertyStore` is an abstract interface; one vtable dispatch occurs at the policy layer but property access is not a tight hot path.

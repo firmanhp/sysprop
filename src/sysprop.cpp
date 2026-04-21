@@ -8,11 +8,14 @@
 #include <sysprop/sysprop.h>
 
 #include "file_backend.h"
-#include "property_store.h"
+#include "file_property_store.h"
+#include <sysprop/property_store.h>
+#include <sysprop/testing/internal.h>
 
 namespace {
 
 using sysprop::internal::FileBackend;
+using sysprop::internal::FilePropertyStore;
 using sysprop::internal::PropertyStore;
 
 // ── Global singleton ──────────────────────────────────────────────────────────
@@ -41,8 +44,8 @@ struct GlobalStore {
 
   FileBackend runtime_;  // NOLINT(misc-non-private-member-variables-in-classes) -- GlobalStore is
                          // an internal impl struct, not a public API class
-  std::optional<FileBackend> persistent_;  // NOLINT(misc-non-private-member-variables-in-classes)
-  PropertyStore store_;                    // NOLINT(misc-non-private-member-variables-in-classes)
+  std::optional<FileBackend> persistent_;   // NOLINT(misc-non-private-member-variables-in-classes)
+  FilePropertyStore store_;                 // NOLINT(misc-non-private-member-variables-in-classes)
 };
 
 // Raw storage avoids any static-initializer or atexit registration.
@@ -54,7 +57,14 @@ alignas(GlobalStore) static unsigned char s_storage[sizeof(
 static GlobalStore* s_instance = nullptr;  // NOLINT(cppcoreguidelines-avoid-non-const-global-variables,readability-static-definition-in-anonymous-namespace)
                                            // -- singleton pointer; null until sysprop_init()
 
-PropertyStore* GetStore() { return s_instance ? &s_instance->store_ : nullptr; }
+// Test-injection override. When non-null, GetStore() returns this instead of
+// the singleton's FilePropertyStore. Set/cleared by swap_store().
+static PropertyStore* s_store_override = nullptr;  // NOLINT(cppcoreguidelines-avoid-non-const-global-variables,readability-static-definition-in-anonymous-namespace)
+
+PropertyStore* GetStore() {
+  if (s_store_override != nullptr) { return s_store_override; }
+  return s_instance ? &s_instance->store_ : nullptr;
+}
 
 }  // namespace
 
@@ -175,3 +185,13 @@ float sysprop_get_float(const char* key, float default_value) {
 }
 
 }  // extern "C"
+
+namespace sysprop::internal {
+
+PropertyStore* swap_store(PropertyStore* new_store) {
+  PropertyStore* prev = s_store_override;
+  s_store_override = new_store;
+  return prev;
+}
+
+}  // namespace sysprop::internal

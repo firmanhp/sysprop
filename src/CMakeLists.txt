@@ -1,7 +1,7 @@
 add_library(sysprop STATIC
     validation.cpp
     file_backend.cpp
-    property_store.cpp
+    file_property_store.cpp
     sysprop.cpp
 )
 

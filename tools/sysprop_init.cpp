@@ -23,10 +23,10 @@
 #include "defaults_loader.h"
 #include "file_backend.h"
 #include "init_helpers.h"
-#include "property_store.h"
+#include "file_property_store.h"
 
 using sysprop::internal::FileBackend;
-using sysprop::internal::PropertyStore;
+using sysprop::internal::FilePropertyStore;
 using sysprop::tools::CleanupTmpFiles;
 using sysprop::tools::InitArgs;
 using sysprop::tools::MkdirP;
@@ -50,7 +50,7 @@ int main(int argc, char* argv[]) {
     persistent_backend = std::make_unique<FileBackend>(args.persistent_dir);
   }
 
-  PropertyStore store{&runtime_backend, persistent_backend.get()};
+  FilePropertyStore store{&runtime_backend, persistent_backend.get()};
 
   // 3. Load persistent properties.
   int total_loaded = 0;

@@ -19,12 +19,12 @@
 
 #include "cli_commands.h"
 #include "file_backend.h"
-#include "property_store.h"
+#include "file_property_store.h"
 
 namespace {
 
 using sysprop::internal::FileBackend;
-using sysprop::internal::PropertyStore;
+using sysprop::internal::FilePropertyStore;
 
 const char* ProgName(const char* argv0) noexcept {
   const char* p = std::strrchr(argv0, '/');
@@ -71,7 +71,7 @@ int main(int argc, char* argv[]) {
   if (cfg.enable_persistence) {
     persistent_backend = std::make_unique<FileBackend>(cfg.persistent_dir);
   }
-  PropertyStore store(&runtime_backend, persistent_backend.get());
+  FilePropertyStore store(&runtime_backend, persistent_backend.get());
 
   const std::string_view name{prog};
 

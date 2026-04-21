@@ -1,6 +1,6 @@
 // Tests for cli_commands.h: DoList, CmdGetprop, CmdSetprop, CmdDelete.
 //
-// Each test constructs a real FileBackend + PropertyStore in a temp dir so the
+// Each test constructs a real FileBackend + FilePropertyStore in a temp dir so the
 // full policy layer (ro.*, persist.*) is exercised together with the CLI.
 // stdout is captured by redirecting STDOUT_FILENO to a pipe.
 
@@ -17,10 +17,10 @@
 
 #include "cli_commands.h"
 #include "file_backend.h"
-#include "property_store.h"
+#include "file_property_store.h"
 
 using sysprop::internal::FileBackend;
-using sysprop::internal::PropertyStore;
+using sysprop::internal::FilePropertyStore;
 
 namespace {
 
@@ -37,7 +37,7 @@ class CliTest : public ::testing::Test {
     dir_ = d;
 
     runtime_ = std::make_unique<FileBackend>(dir_.c_str());
-    store_ = std::make_unique<PropertyStore>(runtime_.get(), nullptr);
+    store_ = std::make_unique<FilePropertyStore>(runtime_.get(), nullptr);
   }
 
   void TearDown() override {
@@ -85,7 +85,7 @@ class CliTest : public ::testing::Test {
 
   std::string dir_;
   std::unique_ptr<FileBackend> runtime_;
-  std::unique_ptr<PropertyStore> store_;
+  std::unique_ptr<FilePropertyStore> store_;
 
  private:
   int pipe_fds_[2] = {-1, -1};

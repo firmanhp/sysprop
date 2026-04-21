@@ -1,7 +1,8 @@
 add_executable(sysprop_tests
     validation_test.cpp
     file_backend_test.cpp
-    property_store_test.cpp
+    file_property_store_test.cpp
+    mock_property_store_test.cpp
     integration_test.cpp
     sysprop_init_test.cpp
     sysprop_main_test.cpp
