@@ -3,7 +3,7 @@
 #include <gtest/gtest.h>
 #include <sysprop/sysprop.h>
 
-using sysprop::internal::MockPropertyStore;
+using sysprop::testing::MockPropertyStore;
 
 // ── Direct usage ──────────────────────────────────────────────────────────────
 

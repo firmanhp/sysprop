@@ -10,7 +10,7 @@
 #include <sysprop/property_store.h>
 #include <sysprop/testing/internal.h>
 
-namespace sysprop::internal {
+namespace sysprop::testing {
 
 // In-memory property store for testing. No key/value validation; no ro.* or
 // persist.* policy enforcement — whatever you set is what you get.
@@ -26,7 +26,7 @@ namespace sysprop::internal {
 //     sysprop_set("key", "val");       // hits mock's hash map
 //     sysprop_get_int("key", 0);       // reads from mock
 //   }  // global store restored here
-class MockPropertyStore final : public PropertyStore {
+class MockPropertyStore final : public sysprop::internal::PropertyStore {
  public:
   MockPropertyStore() : prev_(swap_store(this)) {}
   ~MockPropertyStore() override { swap_store(prev_); }
@@ -74,7 +74,7 @@ class MockPropertyStore final : public PropertyStore {
 
  private:
   std::unordered_map<std::string, std::string> map_;
-  PropertyStore* prev_;
+  sysprop::internal::PropertyStore* prev_;
 };
 
-}  // namespace sysprop::internal
+}  // namespace sysprop::testing

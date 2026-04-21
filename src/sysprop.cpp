@@ -186,12 +186,12 @@ float sysprop_get_float(const char* key, float default_value) {
 
 }  // extern "C"
 
-namespace sysprop::internal {
+namespace sysprop::testing {
 
-PropertyStore* swap_store(PropertyStore* new_store) {
+sysprop::internal::PropertyStore* swap_store(sysprop::internal::PropertyStore* new_store) {
   PropertyStore* prev = s_store_override;
   s_store_override = new_store;
   return prev;
 }
 
-}  // namespace sysprop::internal
+}  // namespace sysprop::testing
