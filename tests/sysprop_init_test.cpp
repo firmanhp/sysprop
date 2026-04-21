@@ -12,10 +12,10 @@
 
 #include "defaults_loader.h"
 #include "file_backend.h"
-#include "property_store.h"
+#include "file_property_store.h"
 
 using sysprop::internal::FileBackend;
-using sysprop::internal::PropertyStore;
+using sysprop::internal::FilePropertyStore;
 using sysprop::tools::LoadDefaultsFile;
 
 // ── Fixture ───────────────────────────────────────────────────────────────────
@@ -31,7 +31,7 @@ class DefaultsLoaderTest : public ::testing::Test {
     ps_dir_ = ps;
     rt_backend_ = std::make_unique<FileBackend>(rt_dir_.c_str());
     ps_backend_ = std::make_unique<FileBackend>(ps_dir_.c_str());
-    store_ = std::make_unique<PropertyStore>(rt_backend_.get(), ps_backend_.get());
+    store_ = std::make_unique<FilePropertyStore>(rt_backend_.get(), ps_backend_.get());
   }
 
   // Write content to a uniquely-named temp file and return its path.
@@ -60,7 +60,7 @@ class DefaultsLoaderTest : public ::testing::Test {
   std::string ps_dir_;
   std::unique_ptr<FileBackend> rt_backend_;
   std::unique_ptr<FileBackend> ps_backend_;
-  std::unique_ptr<PropertyStore> store_;
+  std::unique_ptr<FilePropertyStore> store_;
 };
 
 // ── Basic parsing ─────────────────────────────────────────────────────────────

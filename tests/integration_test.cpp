@@ -9,14 +9,14 @@
 #include <sys/stat.h>
 #include <sysprop/sysprop.h>
 
-// Integration tests exercise PropertyStore + FileBackend directly rather than
+// Integration tests exercise FilePropertyStore + FileBackend directly rather than
 // the global singleton (which is initialised once via call_once and cannot be
 // reset between tests).
 #include "file_backend.h"
-#include "property_store.h"
+#include "file_property_store.h"
 
 using sysprop::internal::FileBackend;
-using sysprop::internal::PropertyStore;
+using sysprop::internal::FilePropertyStore;
 
 // ── Fixture ───────────────────────────────────────────────────────────────────
 
@@ -32,14 +32,14 @@ class IntegrationTest : public ::testing::Test {
 
     rt_backend_ = std::make_unique<FileBackend>(rt_dir_.c_str());
     ps_backend_ = std::make_unique<FileBackend>(ps_dir_.c_str());
-    store_ = std::make_unique<PropertyStore>(rt_backend_.get(), ps_backend_.get());
+    store_ = std::make_unique<FilePropertyStore>(rt_backend_.get(), ps_backend_.get());
   }
 
   std::string rt_dir_;
   std::string ps_dir_;
   std::unique_ptr<FileBackend> rt_backend_;
   std::unique_ptr<FileBackend> ps_backend_;
-  std::unique_ptr<PropertyStore> store_;
+  std::unique_ptr<FilePropertyStore> store_;
   char buf_[SYSPROP_MAX_VALUE_LENGTH] = {};
 };
 
@@ -114,7 +114,7 @@ TEST_F(IntegrationTest, PersistPropertiesAccessibleAfterReboot) {
 
   {
     FileBackend new_runtime{new_rt_dir.c_str()};
-    PropertyStore new_store{&new_runtime, ps_backend_.get()};
+    FilePropertyStore new_store{&new_runtime, ps_backend_.get()};
 
     // persist.* reads directly from persistent_ — no LoadPersistentProperties needed.
     const int n = new_store.Get("persist.sys.timezone", buf_, sizeof(buf_));
@@ -166,7 +166,7 @@ TEST_F(IntegrationTest, MultiplePersistPropsAccessibleAfterReboot) {
 
   {
     FileBackend new_runtime{new_rt_dir.c_str()};
-    PropertyStore new_store{&new_runtime, ps_backend_.get()};
+    FilePropertyStore new_store{&new_runtime, ps_backend_.get()};
 
     for (const char* key : {"persist.a", "persist.b", "persist.c"}) {
       const int n = new_store.Get(key, buf_, sizeof(buf_));
@@ -259,7 +259,7 @@ TEST_F(IntegrationTest, TwoStoresOnSameRuntimeDirRoFirstWins) {
   // Whichever commits first locks it; the other must get READ_ONLY.
   FileBackend shared_rt{rt_dir_.c_str()};
   FileBackend shared_ps{ps_dir_.c_str()};
-  PropertyStore store2{&shared_rt, &shared_ps};
+  FilePropertyStore store2{&shared_rt, &shared_ps};
 
   ASSERT_EQ(SYSPROP_OK, store_->Set("ro.race.key", "first"));
   EXPECT_EQ(SYSPROP_ERR_READ_ONLY, store2.Set("ro.race.key", "second"));
