@@ -82,26 +82,4 @@ int FilePropertyStore::Exists(const char* key) {
   return runtime_->Exists(key);
 }
 
-int FilePropertyStore::ForEach(Visitor fn) {
-  if (persistent_ == nullptr) {
-    auto v = MakeVisitor(fn);
-    return runtime_->ForEach(v);
-  }
-
-  // Iterate runtime first, tracking early stop, then persistent.
-  bool stopped = false;
-  auto track = [&](const char* k, const char* v) -> bool {
-    const bool cont = fn(k, v);
-    if (!cont) { stopped = true; }
-    return cont;
-  };
-  auto tracking_visitor = MakeVisitor(track);
-
-  const int rc = runtime_->ForEach(tracking_visitor);
-  if (rc < 0 || stopped) { return rc; }
-
-  auto pv = MakeVisitor(fn);
-  return persistent_->ForEach(pv);
-}
-
 }  // namespace sysprop::internal

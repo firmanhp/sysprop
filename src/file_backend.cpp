@@ -1,13 +1,11 @@
 #include "file_backend.h"
 
-#include <dirent.h>
 #include <fcntl.h>
 #include <unistd.h>
 
 #include <cerrno>
 #include <cstdio>
 #include <cstring>
-#include <memory>
 
 #include <sysprop/sysprop.h>
 
@@ -45,14 +43,6 @@ UniqueFd OpenReadOnly(const char* path) { return UniqueFd{::open(path, O_RDONLY 
 UniqueFd OpenWriteNew(const char* path) {
   return UniqueFd{::open(path, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, kFileMode)};
 }
-
-// RAII wrapper for a DIR*.
-struct CloseDirFn {
-  void operator()(DIR* d) const { ::closedir(d); }
-};
-using UniqueDir = std::unique_ptr<DIR, CloseDirFn>;
-
-UniqueDir OpenDir(const char* path) { return UniqueDir{::opendir(path)}; }
 
 }  // namespace
 
@@ -151,37 +141,6 @@ int FileBackend::Exists(const char* key) {
   }
 
   return (::access(path, F_OK) == 0) ? SYSPROP_OK : SYSPROP_ERR_NOT_FOUND;
-}
-
-int FileBackend::ForEach(Visitor visitor) {
-  const UniqueDir dir = OpenDir(base_path_);
-  if (!dir) {
-    return SYSPROP_ERR_IO;
-  }
-
-  // Value read buffer — stack-allocated and reused for every entry.
-  char val_buf[SYSPROP_MAX_VALUE_LENGTH];
-
-  const struct dirent* entry = nullptr;
-  while ((entry = ::readdir(dir.get())) !=
-         nullptr) {  // NOLINT(concurrency-mt-unsafe) -- single-threaded use: ForEach is called from
-                     // the main thread before any other threads start
-    // Skip hidden files (covers ".", "..", and our ".tmp.*" temp files).
-    if (entry->d_name[0] == '.') {
-      continue;
-    }
-
-    const int rc = Get(entry->d_name, val_buf, sizeof(val_buf));
-    if (rc < 0) {
-      continue;
-    }  // Skip unreadable entries silently.
-
-    if (!visitor(entry->d_name, val_buf)) {
-      break;
-    }
-  }
-
-  return SYSPROP_OK;
 }
 
 }  // namespace sysprop::internal

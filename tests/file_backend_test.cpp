@@ -15,7 +15,6 @@
 #include <sysprop/sysprop.h>
 
 using sysprop::internal::FileBackend;
-using sysprop::internal::MakeVisitor;
 
 // ── Fixture ───────────────────────────────────────────────────────────────────
 
@@ -122,65 +121,6 @@ TEST_F(FileBackendTest, GetNullBuffer) {
   EXPECT_EQ(SYSPROP_ERR_BUFFER_TOO_SMALL, backend_->Get("any.key", nullptr, 0));
 }
 
-// ── ForEach ───────────────────────────────────────────────────────────────────
-
-TEST_F(FileBackendTest, ForEachEmpty) {
-  int count = 0;
-  auto fn = [&](const char*, const char*) {
-    ++count;
-    return true;
-  };
-  const int rc = backend_->ForEach(MakeVisitor(fn));
-  EXPECT_EQ(SYSPROP_OK, rc);
-  EXPECT_EQ(0, count);
-}
-
-TEST_F(FileBackendTest, ForEachSeveralKeys) {
-  ASSERT_EQ(SYSPROP_OK, backend_->Set("a.key", "1"));
-  ASSERT_EQ(SYSPROP_OK, backend_->Set("b.key", "2"));
-  ASSERT_EQ(SYSPROP_OK, backend_->Set("c.key", "3"));
-
-  std::vector<std::pair<std::string, std::string>> collected;
-  auto fn = [&](const char* k, const char* v) {
-    collected.emplace_back(k, v);
-    return true;
-  };
-  (void)backend_->ForEach(MakeVisitor(fn));
-  EXPECT_EQ(3u, collected.size());
-}
-
-TEST_F(FileBackendTest, ForEachEarlyStop) {
-  ASSERT_EQ(SYSPROP_OK, backend_->Set("a.key", "1"));
-  ASSERT_EQ(SYSPROP_OK, backend_->Set("b.key", "2"));
-  ASSERT_EQ(SYSPROP_OK, backend_->Set("c.key", "3"));
-
-  int count = 0;
-  auto fn = [&](const char*, const char*) {
-    ++count;
-    return false;
-  };
-  (void)backend_->ForEach(MakeVisitor(fn));
-  EXPECT_EQ(1, count);
-}
-
-TEST_F(FileBackendTest, ForEachSkipsTmpFiles) {
-  // Manually place a stale .tmp.* file in the directory.
-  const std::string tmp_file = tmp_dir_ + "/.tmp.stale.123";
-  FILE* f = std::fopen(tmp_file.c_str(), "w");
-  ASSERT_NE(f, nullptr);
-  std::fclose(f);
-
-  ASSERT_EQ(SYSPROP_OK, backend_->Set("real.key", "v"));
-
-  int count = 0;
-  auto fn = [&](const char*, const char*) {
-    ++count;
-    return true;
-  };
-  (void)backend_->ForEach(MakeVisitor(fn));
-  EXPECT_EQ(1, count);  // Only the real key, not the .tmp.* file.
-}
-
 // ── Filesystem-attack hardening ───────────────────────────────────────────────
 
 TEST_F(FileBackendTest, GetFromNonexistentBaseDirReturnsError) {
@@ -246,56 +186,6 @@ TEST_F(FileBackendTest, GetUnreadablePropertyFileReturnsError) {
   ASSERT_EQ(0, ::chmod((tmp_dir_ + "/perm.key").c_str(), 0000));
   EXPECT_NE(SYSPROP_OK, backend_->Get("perm.key", buf_, sizeof(buf_)));
   ::chmod((tmp_dir_ + "/perm.key").c_str(), 0644);  // restore for TearDown
-}
-
-TEST_F(FileBackendTest, ForEachSkipsInjectedDotFiles) {
-  // Files starting with '.' cannot be created via the validated API, but an
-  // attacker with filesystem access could inject them; they must not surface.
-  const std::string injected = tmp_dir_ + "/.injected_secret";
-  FILE* f = std::fopen(injected.c_str(), "w");
-  ASSERT_NE(f, nullptr);
-  std::fputs("evil", f);
-  std::fclose(f);
-
-  ASSERT_EQ(SYSPROP_OK, backend_->Set("real.key", "v"));
-
-  int count = 0;
-  auto fn = [&](const char*, const char*) {
-    ++count;
-    return true;
-  };
-  (void)backend_->ForEach(MakeVisitor(fn));
-  EXPECT_EQ(1, count);
-}
-
-TEST_F(FileBackendTest, ForEachSkipsSubdirectories) {
-  // A subdirectory in the store (e.g., from a bug or attack) must be silently
-  // skipped, not crash or corrupt iteration.
-  ASSERT_EQ(0, ::mkdir((tmp_dir_ + "/subdir.entry").c_str(), 0755));
-  ASSERT_EQ(SYSPROP_OK, backend_->Set("real.key", "v"));
-
-  int count = 0;
-  auto fn = [&](const char*, const char*) {
-    ++count;
-    return true;
-  };
-  (void)backend_->ForEach(MakeVisitor(fn));
-  EXPECT_EQ(1, count);
-}
-
-TEST_F(FileBackendTest, ForEachWithManyKeys) {
-  constexpr int kCount = 200;
-  for (int i = 0; i < kCount; ++i) {
-    ASSERT_EQ(SYSPROP_OK,
-              backend_->Set(("k." + std::to_string(i)).c_str(), std::to_string(i).c_str()));
-  }
-  int count = 0;
-  auto fn = [&](const char*, const char*) {
-    ++count;
-    return true;
-  };
-  (void)backend_->ForEach(MakeVisitor(fn));
-  EXPECT_EQ(kCount, count);
 }
 
 // ── Concurrency ───────────────────────────────────────────────────────────────

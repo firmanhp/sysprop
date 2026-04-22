@@ -1,9 +1,6 @@
 #include "cli_commands.h"
 
-#include <algorithm>
 #include <iostream>
-#include <string>
-#include <vector>
 
 #include <sysprop/sysprop.h>
 
@@ -11,22 +8,10 @@
 
 namespace sysprop::tools {
 
-int DoList(sysprop::internal::PropertyStore& store) {
-  std::vector<std::pair<std::string, std::string>> props;
-  (void)store.ForEach([&](const char* key, const char* value) {
-    props.emplace_back(key, value);
-    return true;
-  });
-  std::sort(props.begin(), props.end());
-  for (const auto& [k, v] : props) {
-    std::cout << '[' << k << "]: [" << v << "]\n";
-  }
-  return 0;
-}
-
 int CmdGetprop(int argc, char* argv[], sysprop::internal::PropertyStore& store) {
-  if (argc == 1) {
-    return DoList(store);
+  if (argc < 2) {
+    std::cerr << "Usage: getprop <key> [default]\n";
+    return 1;
   }
 
   const char* key = argv[1];

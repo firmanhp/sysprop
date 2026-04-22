@@ -39,22 +39,6 @@ class FileBackend final {
   [[nodiscard]] int Delete(const char* key);
   [[nodiscard]] int Exists(const char* key);
 
-  // Non-owning, non-allocating visitor passed to ForEach.
-  // fn must not be null. The callable and its context must outlive the Visitor.
-  struct Visitor {
-    bool (*fn)(
-        void* ctx, const char* key,
-        const char* value);  // NOLINT(misc-non-private-member-variables-in-classes) -- Visitor is a
-                             // POD-like callback carrier; public members are intentional
-    void* ctx;               // NOLINT(misc-non-private-member-variables-in-classes)
-    bool operator()(const char* key, const char* value) const { return fn(ctx, key, value); }
-  };
-
-  // Iterate over all stored properties. The visitor is called once per entry
-  // with null-terminated key and value strings. Iteration stops early if
-  // visitor returns false.
-  [[nodiscard]] int ForEach(Visitor visitor);
-
  private:
   // Writes the full path for key into dst. Returns false if the result would
   // exceed dst_len.
@@ -63,14 +47,5 @@ class FileBackend final {
   static constexpr std::size_t kMaxBasePathSize = 4096;
   char base_path_[kMaxBasePathSize];
 };
-
-// Create a Visitor from any callable (lambda, functor). The callable is held
-// by pointer — it must outlive the returned Visitor.
-template <typename F>
-FileBackend::Visitor MakeVisitor(F& f) {
-  return {
-      [](void* ctx, const char* k, const char* v) -> bool { return (*static_cast<F*>(ctx))(k, v); },
-      &f};
-}
 
 }  // namespace sysprop::internal

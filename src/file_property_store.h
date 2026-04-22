@@ -26,7 +26,6 @@ class FilePropertyStore final : public PropertyStore {
   [[nodiscard]] int Set(const char* key, const char* value) override;
   [[nodiscard]] int Delete(const char* key) override;
   [[nodiscard]] int Exists(const char* key) override;
-  [[nodiscard]] int ForEach(Visitor fn) override;
 
  private:
   FileBackend* runtime_;

@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstddef>
-#include <functional>
 
 namespace sysprop::internal {
 
@@ -12,8 +11,6 @@ namespace sysprop::internal {
 //   MockPropertyStore  — in-memory hash-map store for testing (RAII injection)
 class PropertyStore {
  public:
-  using Visitor = std::function<bool(const char* key, const char* value)>;
-
   PropertyStore() = default;
   PropertyStore(const PropertyStore&) = default;
   PropertyStore& operator=(const PropertyStore&) = default;
@@ -25,9 +22,6 @@ class PropertyStore {
   [[nodiscard]] virtual int Set(const char* key, const char* value) = 0;
   [[nodiscard]] virtual int Delete(const char* key) = 0;
   [[nodiscard]] virtual int Exists(const char* key) = 0;
-
-  // Iterate over all properties. Visitor returns false to stop early.
-  [[nodiscard]] virtual int ForEach(Visitor fn) = 0;
 };
 
 }  // namespace sysprop::internal

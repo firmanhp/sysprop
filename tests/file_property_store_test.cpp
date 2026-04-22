@@ -87,44 +87,6 @@ TEST_F(FilePropertyStoreTest, ExistsRejectsInvalidKey) {
   EXPECT_EQ(SYSPROP_ERR_INVALID_KEY, store_.Exists(""));
 }
 
-TEST_F(FilePropertyStoreTest, ForEachIteratesRuntimeProperties) {
-  ASSERT_EQ(SYSPROP_OK, store_.Set("a.x", "1"));
-  ASSERT_EQ(SYSPROP_OK, store_.Set("b.y", "2"));
-  ASSERT_EQ(SYSPROP_OK, store_.Set("c.z", "3"));
-
-  int count = 0;
-  (void)store_.ForEach([&](const char*, const char*) {
-    ++count;
-    return true;
-  });
-  EXPECT_EQ(3, count);
-}
-
-TEST_F(FilePropertyStoreTest, ForEachIncludesPersistProperties) {
-  ASSERT_EQ(SYSPROP_OK, store_.Set("a.x", "1"));
-  ASSERT_EQ(SYSPROP_OK, store_.Set("persist.y", "2"));
-
-  int count = 0;
-  (void)store_.ForEach([&](const char*, const char*) {
-    ++count;
-    return true;
-  });
-  EXPECT_EQ(2, count);
-}
-
-TEST_F(FilePropertyStoreTest, ForEachEarlyStop) {
-  ASSERT_EQ(SYSPROP_OK, store_.Set("a.x", "1"));
-  ASSERT_EQ(SYSPROP_OK, store_.Set("b.y", "2"));
-  ASSERT_EQ(SYSPROP_OK, store_.Set("c.z", "3"));
-
-  int count = 0;
-  (void)store_.ForEach([&](const char*, const char*) {
-    ++count;
-    return false;
-  });
-  EXPECT_EQ(1, count);
-}
-
 TEST_F(FilePropertyStoreTest, SetRejectsValueTooLong) {
   const std::string too_long(SYSPROP_MAX_VALUE_LENGTH, 'x');
   EXPECT_EQ(SYSPROP_ERR_VALUE_TOO_LONG, store_.Set("test.key", too_long.c_str()));
@@ -316,20 +278,3 @@ TEST_F(FilePropertyStoreTest, PersistPropertiesAccessibleWithoutLoading) {
   EXPECT_STREQ("1", buf_);
 }
 
-// ── ForEach error propagation ─────────────────────────────────────────────────
-
-TEST_F(FilePropertyStoreTest, ForEachPropagatesBackendError) {
-  if (::getuid() == 0) {
-    GTEST_SKIP() << "root bypasses permission checks";
-  }
-  ASSERT_EQ(SYSPROP_OK, store_.Set("hw.ok", "yes"));
-  ASSERT_EQ(0, ::chmod(rt_dir_.c_str(), 0000)) << strerror(errno);
-  int count = 0;
-  const int rc = store_.ForEach([&](const char*, const char*) {
-    ++count;
-    return true;
-  });
-  ::chmod(rt_dir_.c_str(), 0755);
-  EXPECT_LT(rc, 0);
-  EXPECT_EQ(0, count);
-}

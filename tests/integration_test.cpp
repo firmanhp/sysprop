@@ -126,36 +126,6 @@ TEST_F(IntegrationTest, PersistPropertiesAccessibleAfterReboot) {
   }
 }
 
-// ── ForEach ───────────────────────────────────────────────────────────────────
-
-TEST_F(IntegrationTest, ForEachVisitsAllProperties) {
-  ASSERT_EQ(SYSPROP_OK, store_->Set("a.x", "1"));
-  ASSERT_EQ(SYSPROP_OK, store_->Set("b.y", "2"));
-  ASSERT_EQ(SYSPROP_OK, store_->Set("c.z", "3"));
-
-  int count = 0;
-  (void)store_->ForEach([&](const char*, const char*) {
-    ++count;
-    return true;
-  });
-  EXPECT_EQ(3, count);
-}
-
-// ── ForEach early stop ────────────────────────────────────────────────────────
-
-TEST_F(IntegrationTest, ForEachEarlyStop) {
-  ASSERT_EQ(SYSPROP_OK, store_->Set("a.x", "1"));
-  ASSERT_EQ(SYSPROP_OK, store_->Set("b.y", "2"));
-  ASSERT_EQ(SYSPROP_OK, store_->Set("c.z", "3"));
-
-  int count = 0;
-  (void)store_->ForEach([&](const char*, const char*) {
-    ++count;
-    return false;
-  });
-  EXPECT_EQ(1, count);
-}
-
 // ── Multiple persist props survive reboot ─────────────────────────────────────
 
 TEST_F(IntegrationTest, MultiplePersistPropsAccessibleAfterReboot) {

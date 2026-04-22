@@ -70,34 +70,6 @@ TEST(MockPropertyStoreTest, NoPolicyEnforcement) {
   EXPECT_STREQ("v2", buf);
 }
 
-TEST(MockPropertyStoreTest, ForEachVisitsAllKeys) {
-  MockPropertyStore mock;
-  ASSERT_EQ(SYSPROP_OK, mock.Set("a.x", "1"));
-  ASSERT_EQ(SYSPROP_OK, mock.Set("b.y", "2"));
-  ASSERT_EQ(SYSPROP_OK, mock.Set("c.z", "3"));
-
-  int count = 0;
-  (void)mock.ForEach([&](const char*, const char*) {
-    ++count;
-    return true;
-  });
-  EXPECT_EQ(3, count);
-}
-
-TEST(MockPropertyStoreTest, ForEachEarlyStop) {
-  MockPropertyStore mock;
-  ASSERT_EQ(SYSPROP_OK, mock.Set("a.x", "1"));
-  ASSERT_EQ(SYSPROP_OK, mock.Set("b.y", "2"));
-  ASSERT_EQ(SYSPROP_OK, mock.Set("c.z", "3"));
-
-  int count = 0;
-  (void)mock.ForEach([&](const char*, const char*) {
-    ++count;
-    return false;
-  });
-  EXPECT_EQ(1, count);
-}
-
 // ── RAII injection — sysprop_xxx() hits the mock ─────────────────────────────
 
 TEST(MockPropertyStoreTest, SyspropSetAndGetHitMock) {

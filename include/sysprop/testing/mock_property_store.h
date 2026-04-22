@@ -62,13 +62,6 @@ class MockPropertyStore final : public sysprop::internal::PropertyStore {
     return map_.count(key) != 0 ? SYSPROP_OK : SYSPROP_ERR_NOT_FOUND;
   }
 
-  int ForEach(Visitor fn) override {
-    for (const auto& [k, v] : map_) {
-      if (!fn(k.c_str(), v.c_str())) { break; }
-    }
-    return SYSPROP_OK;
-  }
-
  private:
   std::unordered_map<std::string, std::string> map_;
   sysprop::internal::PropertyStore* prev_;

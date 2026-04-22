@@ -3,7 +3,7 @@
 // Dispatch rules:
 //   argv[0] == "getprop"  →  do_getprop
 //   argv[0] == "setprop"  →  do_setprop
-//   argv[0] == "sysprop"  →  dispatch on argv[1] (get / set / delete / list)
+//   argv[0] == "sysprop"  →  dispatch on argv[1] (get / set / delete)
 //
 // Environment overrides:
 //   SYSPROP_RUNTIME_DIR    — override the runtime property directory
@@ -51,15 +51,14 @@ ToolConfig ConfigFromEnv() {
 void PrintUsage(const char* prog) {
   std::fprintf(stderr,
                "Usage:\n"
-               "  %s get [key] [default]  -- print property (or all if no key)\n"
-               "  %s set key value        -- set a property\n"
-               "  %s delete key           -- delete a property\n"
-               "  %s list                 -- list all properties\n"
+               "  %s get key [default]  -- print property value\n"
+               "  %s set key value      -- set a property\n"
+               "  %s delete key         -- delete a property\n"
                "\n"
                "Environment:\n"
                "  SYSPROP_RUNTIME_DIR     override runtime directory    (default: %s)\n"
                "  SYSPROP_PERSISTENT_DIR  override persistent directory (default: %s)\n",
-               prog, prog, prog, prog, SYSPROP_RUNTIME_DIR, SYSPROP_PERSISTENT_DIR);
+               prog, prog, prog, SYSPROP_RUNTIME_DIR, SYSPROP_PERSISTENT_DIR);
 }
 
 }  // namespace
@@ -94,7 +93,6 @@ int main(int argc, char* argv[]) {
   if (cmd == "get") return sysprop::tools::CmdGetprop(argc - 1, argv + 1, store);
   if (cmd == "set") return sysprop::tools::CmdSetprop(argc - 1, argv + 1, store);
   if (cmd == "delete") return sysprop::tools::CmdDelete(argc - 1, argv + 1, store);
-  if (cmd == "list") return sysprop::tools::DoList(store);
 
   std::fprintf(stderr, "sysprop: unknown command '%s'\n", argv[1]);
   PrintUsage(prog);

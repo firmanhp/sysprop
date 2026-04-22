@@ -111,63 +111,12 @@ struct MutableArgv {
 
 }  // namespace
 
-// ── DoList ────────────────────────────────────────────────────────────────────
-
-TEST_F(CliTest, DoListEmptyStoreProducesNoOutput) {
-  BeginCapture();
-  const int rc = sysprop::tools::DoList(*store_);
-  const std::string out = EndCapture();
-  EXPECT_EQ(rc, 0);
-  EXPECT_TRUE(out.empty());
-}
-
-TEST_F(CliTest, DoListOnePropertyPrintsBracketed) {
-  Set("hw.version", "2");
-  BeginCapture();
-  const int rc = sysprop::tools::DoList(*store_);
-  const std::string out = EndCapture();
-  EXPECT_EQ(rc, 0);
-  EXPECT_EQ(out, "[hw.version]: [2]\n");
-}
-
-TEST_F(CliTest, DoListMultiplePropertiesSortedAlphabetically) {
-  Set("z.last", "Z");
-  Set("a.first", "A");
-  Set("m.mid", "M");
-  BeginCapture();
-  const int rc = sysprop::tools::DoList(*store_);
-  const std::string out = EndCapture();
-  EXPECT_EQ(rc, 0);
-  // Verify order: a.first < m.mid < z.last
-  const std::size_t pa = out.find("[a.first]");
-  const std::size_t pm = out.find("[m.mid]");
-  const std::size_t pz = out.find("[z.last]");
-  ASSERT_NE(pa, std::string::npos);
-  ASSERT_NE(pm, std::string::npos);
-  ASSERT_NE(pz, std::string::npos);
-  EXPECT_LT(pa, pm);
-  EXPECT_LT(pm, pz);
-}
-
-TEST_F(CliTest, DoListOutputFormatIsKeyColon) {
-  Set("foo.bar", "hello world");
-  BeginCapture();
-  (void)sysprop::tools::DoList(*store_);
-  const std::string out = EndCapture();
-  EXPECT_EQ(out, "[foo.bar]: [hello world]\n");
-}
-
 // ── CmdGetprop ────────────────────────────────────────────────────────────────
 
-// getprop with no key → list all
-TEST_F(CliTest, CmdGetpropNoArgListsAll) {
-  Set("list.key", "listed");
+// getprop with no key → usage error
+TEST_F(CliTest, CmdGetpropNoArgReturnsOne) {
   MutableArgv av{"getprop"};
-  BeginCapture();
-  const int rc = sysprop::tools::CmdGetprop(av.argc(), av.data(), *store_);
-  const std::string out = EndCapture();
-  EXPECT_EQ(rc, 0);
-  EXPECT_NE(out.find("[list.key]: [listed]"), std::string::npos);
+  EXPECT_EQ(sysprop::tools::CmdGetprop(av.argc(), av.data(), *store_), 1);
 }
 
 // getprop key → found, prints value
@@ -287,13 +236,3 @@ TEST_F(CliTest, CmdDeleteRoKeyReturnsOne) {
   EXPECT_STREQ(buf, "EVB-1");
 }
 
-// ── DoList with empty-value properties ───────────────────────────────────────
-
-TEST_F(CliTest, DoListEmptyValueProperty) {
-  Set("empty.val", "");
-  BeginCapture();
-  const int rc = sysprop::tools::DoList(*store_);
-  const std::string out = EndCapture();
-  EXPECT_EQ(rc, 0);
-  EXPECT_EQ(out, "[empty.val]: []\n");
-}
