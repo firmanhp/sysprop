@@ -16,7 +16,11 @@ set(SYSPROP_RUNTIME_DIR    "/run/sysprop/props"       CACHE STRING "Default runt
 set(SYSPROP_PERSISTENT_DIR "/etc/sysprop/persistent"  CACHE STRING "Default persistent property directory")
 set(SYSPROP_MAX_KEY_LENGTH   256 CACHE STRING "Maximum property key length in bytes")
 set(SYSPROP_MAX_VALUE_LENGTH 256 CACHE STRING "Maximum property value length in bytes")
-option(SYSPROP_ENABLE_PERSISTENCE "Build the persistent property backend into the library" ON)
+if(SYSPROP_PERSISTENT_DIR STREQUAL "")
+    set(SYSPROP_ENABLE_PERSISTENCE 0)
+else()
+    set(SYSPROP_ENABLE_PERSISTENCE 1)
+endif()
 
 # ── Compile flags ──────────────────────────────────────────────────────────────
 # Single build configuration: no Debug/Release split. Flags are explicit and

@@ -5,9 +5,9 @@
 //   argv[0] == "setprop"  →  do_setprop
 //   argv[0] == "sysprop"  →  dispatch on argv[1] (get / set / delete)
 //
-// Directory paths and persistence are baked in at build time via CMake cache
-// variables: SYSPROP_RUNTIME_DIR, SYSPROP_PERSISTENT_DIR,
-// SYSPROP_ENABLE_PERSISTENCE.
+// Directory paths are baked in at build time via CMake cache variables:
+// SYSPROP_RUNTIME_DIR, SYSPROP_PERSISTENT_DIR. Persistence is enabled when
+// SYSPROP_PERSISTENT_DIR is non-empty.
 
 #include <cstdio>
 #include <cstring>

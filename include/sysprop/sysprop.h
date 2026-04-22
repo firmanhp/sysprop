@@ -38,6 +38,9 @@
 #ifndef SYSPROP_MAX_VALUE_LENGTH
 #  define SYSPROP_MAX_VALUE_LENGTH 256
 #endif
+#ifndef SYSPROP_ENABLE_PERSISTENCE
+#  define SYSPROP_ENABLE_PERSISTENCE 1
+#endif
 
 // ── Error codes ───────────────────────────────────────────────────────────────
 // Negative = error; 0 = success. Functions returning a byte count return a

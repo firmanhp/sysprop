@@ -9,9 +9,9 @@
 // Usage:
 //   sysprop-init [defaults-file]
 //
-// Directory paths and persistence are baked in at build time via CMake cache
-// variables: SYSPROP_RUNTIME_DIR, SYSPROP_PERSISTENT_DIR,
-// SYSPROP_ENABLE_PERSISTENCE.
+// Directory paths are baked in at build time via CMake cache variables:
+// SYSPROP_RUNTIME_DIR, SYSPROP_PERSISTENT_DIR. Persistence is enabled when
+// SYSPROP_PERSISTENT_DIR is non-empty.
 
 #include <cstdio>
 #include <memory>

@@ -38,11 +38,11 @@ struct GlobalStore {
         store_{&runtime_, persistent_ ? &*persistent_ : nullptr} {}
 
   static std::optional<FileBackend> MakePersistent() {
-#if SYSPROP_ENABLE_PERSISTENCE
-    return FileBackend{SYSPROP_PERSISTENT_DIR};
-#else
-    return std::nullopt;
-#endif
+    if constexpr (SYSPROP_ENABLE_PERSISTENCE) {
+      return FileBackend{SYSPROP_PERSISTENT_DIR};
+    } else {
+      return std::nullopt;
+    }
   }
 
   FileBackend runtime_;
