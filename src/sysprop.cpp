@@ -1,4 +1,5 @@
 #include <cerrno>
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <new>  // NOLINT(misc-include-cleaner) -- required for placement new (new (s_storage) ...) even though it arrives transitively
@@ -117,9 +118,7 @@ int sysprop_get_int(const char* key, int default_value) {
 
   char* end = nullptr;
   errno = 0;
-  const long val =
-      std::strtol(buf, &end, 10);  // NOLINT(google-runtime-int) -- strtol returns long by
-                                   // specification; narrowing to int64_t would misrepresent the API
+  const int64_t val = std::strtol(buf, &end, 10);
   if (end == buf || errno != 0) {
     return default_value;
   }

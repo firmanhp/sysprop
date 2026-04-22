@@ -46,12 +46,8 @@ UniqueFd OpenWriteNew(const char* path) {
 
 }  // namespace
 
-FileBackend::FileBackend(
-    const char* base_path) {  // NOLINT(cppcoreguidelines-pro-type-member-init,hicpp-member-init) --
-                              // base_path_ is a char array; it cannot be member-initialized,
-                              // strncpy in the body is the correct idiom
+FileBackend::FileBackend(const char* base_path) : base_path_{} {
   std::strncpy(base_path_, base_path, kMaxBasePathSize - 1);
-  base_path_[kMaxBasePathSize - 1] = '\0';
 }
 
 bool FileBackend::BuildPath(char* dst, std::size_t dst_len, const char* key)
