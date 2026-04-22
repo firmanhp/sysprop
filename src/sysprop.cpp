@@ -25,7 +25,7 @@ using sysprop::internal::PropertyStore;
 // All configuration is baked in at compile time (SYSPROP_RUNTIME_DIR etc.).
 // constexpr constructors throughout the chain let the linker constant-initialize
 // g_instance before any dynamic initialization runs — no runtime work, no
-// placement-new, no __attribute__((constructor)).
+// placement-new, no __attribute__((constructor)). constinit enforces this.
 //
 // Thread safety: constant initialization completes before any dynamic init or
 // thread creation. Concurrent property access is safe because FileBackend
@@ -42,7 +42,7 @@ struct GlobalStore {
   FilePropertyStore store_;
 };
 
-GlobalStore g_instance;
+constinit GlobalStore g_instance;
 PropertyStore* s_store_override = nullptr;
 
 PropertyStore* GetStore() {
