@@ -6,50 +6,51 @@ services from early boot onward.
 
 ---
 
-## How It Works at a Glance
+## How It Works
 
 There are two storage locations:
 
-| Directory | Default path | Filesystem | Survives reboot? | Purpose |
+| Directory | Default path | Filesystem | Survives reboot? | Holds |
 |---|---|---|---|---|
-| **Runtime dir** | `/run/sysprop/props` | tmpfs (`/run`) | No | Live read/write store for all processes |
-| **Persistent dir** | `/etc/sysprop/persistent` | rootfs | Yes | Long-term storage for `persist.*` properties |
+| **Runtime dir** | `/run/sysprop/props` | tmpfs (`/run`) | No | Volatile and `ro.*` properties |
+| **Persistent dir** | `/etc/sysprop/persistent` | rootfs | Yes | `persist.*` properties |
 
 `/run` is a tmpfs that systemd mounts automatically during early boot. Everything
 under it is wiped on every reboot. This means:
 
-- **At every boot**, `sysprop-init` must run before any service that reads properties.
-- It re-creates the runtime directory, cleans up any leftover temp files from a
-  previous crash, and copies persisted properties back into the runtime store.
-- After `sysprop-init` exits, the runtime store is ready and all `sysprop` operations
-  are fast in-memory file reads with no I/O to persistent storage.
+- **At every boot**, `sysprop-init` must run before any service that reads or
+  writes properties. It re-creates the runtime directory, cleans up stale temp
+  files from a previous crash, and optionally loads a defaults file.
+- **`ro.*` and volatile properties** from the defaults file are re-set on every
+  boot because the runtime tmpfs is cleared on reboot.
+- **`persist.*` properties** are stored on disk in the persistent directory.
+  Processes read and write them there directly — they are never copied to the
+  runtime directory.
 
 ---
 
 ## Directory Layout
 
 ```
-/run/sysprop/props/          ← runtime dir (created by sysprop-init at boot)
-    net.hostname             ← a volatile property file
-    persist.wifi.ssid        ← a persist.* property (copy of what's on disk)
-    ro.build.version         ← a read-only property
+/run/sysprop/props/          ← runtime dir (tmpfs; created by sysprop-init)
+    device.name              ← volatile property
+    ro.build.version         ← read-only property
 
-/etc/sysprop/persistent/     ← persistent dir (survives reboots)
-    persist.wifi.ssid        ← source of truth for persist.* properties
+/etc/sysprop/persistent/     ← persistent dir (on disk; created by sysprop-init)
+    persist.wifi.ssid        ← persistent property
 
 /etc/sysprop/build.prop      ← optional: factory defaults file (key=value)
 ```
 
-You do not manage these files directly. Always use `sysprop-init` or the `sysprop`
-CLI. Writing files into these directories by hand is only appropriate for
-provisioning at factory time.
+Do not write files into these directories by hand. Always use `sysprop-init` or
+the `sysprop` CLI.
 
 ---
 
 ## Step 1 — Install the Binaries
 
 ```bash
-cmake -B build -DCMAKE_BUILD_TYPE=Release -DSYSPROP_BUILD_TOOLS=ON
+cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 cmake --install build --prefix /usr
 ```
@@ -64,13 +65,14 @@ This installs:
 
 ## Step 2 — Create the sysprop-init Service Unit
 
+The runtime and persistent directory paths are baked into the binary at build
+time. The only runtime argument accepted is an optional defaults file path.
+
 Create `/etc/systemd/system/sysprop-init.service`:
 
 ```ini
 [Unit]
 Description=System Property Store Initializer
-# Run after the filesystem is mounted read-write but before any service
-# that depends on properties. syss-init.target is a good anchor point.
 DefaultDependencies=no
 After=local-fs.target
 Before=sysinit.target
@@ -78,25 +80,16 @@ Before=sysinit.target
 [Service]
 Type=oneshot
 
-# The service runs once and exits. RemainAfterExit=yes lets other units
-# use "After=sysprop-init.service" reliably — systemd considers the service
-# "active" even after the process has exited.
+# RemainAfterExit=yes lets other units use "After=sysprop-init.service"
+# reliably — systemd treats the service as active after the process exits.
 RemainAfterExit=yes
 
-ExecStart=/usr/bin/sysprop-init \
-    --runtime-dir    /run/sysprop/props \
-    --persistent-dir /etc/sysprop/persistent \
-    /etc/sysprop/build.prop
-
-# If build.prop does not exist yet (fresh device), sysprop-init exits with
-# an error for that step but the service should still succeed. Remove the
-# defaults file argument above if you have no build.prop.
-
-# Ensure the persistent directory exists on first boot.
-ExecStartPre=/usr/bin/mkdir -p /etc/sysprop/persistent
+# Optionally pass a defaults file. Remove the argument if you have no build.prop.
+# If the file is specified but does not exist, sysprop-init exits with an error.
+ExecStart=/usr/bin/sysprop-init /etc/sysprop/build.prop
 
 # Do not restart on failure — a broken property store at boot is a hard
-# fault that requires operator attention, not an automatic retry.
+# fault that requires operator attention.
 Restart=no
 
 [Install]
@@ -122,8 +115,8 @@ After=sysprop-init.service
 Requires=sysprop-init.service
 ```
 
-Use `Requires=` if your service cannot function at all without properties.
-Use `Wants=` instead if property availability is optional (best-effort).
+Use `Requires=` if your service cannot function without properties. Use `Wants=`
+if property availability is optional (best-effort).
 
 **Example — a network service that reads its config from properties:**
 
@@ -148,14 +141,13 @@ WantedBy=multi-user.target
 ## Step 4 — Create a build.prop Defaults File (Optional)
 
 `build.prop` is a plain text file with one `key=value` per line. Lines starting
-with `#` are comments. `sysprop-init` loads it after persistent properties, so
-persistent values take precedence over the defaults here.
+with `#` are comments. Leading whitespace is ignored. `sysprop-init` sets these
+properties at boot, making them available for the lifetime of the boot session.
 
 Create `/etc/sysprop/build.prop`:
 
 ```
 # Factory defaults — do not edit at runtime.
-# Changes here take effect on next boot.
 
 ro.build.version=1.0.0
 ro.build.date=2025-01-01
@@ -169,15 +161,16 @@ sys.log.level=info
 
 Key naming rules:
 - Allowed characters: `a–z A–Z 0–9 . _ -`
-- No leading/trailing dots, no consecutive dots (`..`)
-- Maximum length: 255 characters for both key and value
-- `ro.*` — read-only after first set; any later attempt to change them fails
-- `persist.*` — written to both the runtime and persistent store; survives reboots
+- No leading/trailing dots, no consecutive dots
+- Maximum length: 255 bytes for both key and value
+- `ro.*` — read-only after first set; any later attempt to change them is rejected
+- `persist.*` — stored on disk; survives reboots
 - Everything else — volatile; lost on reboot
 
-> **Note:** `ro.*` properties in `build.prop` are set during `sysprop-init` and then
-> become immutable for the lifetime of that boot. They cannot be changed even by root
-> without rebooting.
+> **Note:** `ro.*` properties set from `build.prop` become immutable for the
+> lifetime of that boot. They must be present in `build.prop` (or set by a
+> service before any other service tries to write them) because the runtime
+> tmpfs is cleared on every reboot.
 
 ---
 
@@ -186,23 +179,23 @@ Key naming rules:
 ### Read a property
 
 ```bash
-sysprop get ro.build.version        # prints value, or blank if not found
-sysprop get net.hostname unknown    # prints "unknown" if the key does not exist
-getprop ro.build.version            # same, using the getprop alias
+sysprop get ro.build.version       # prints value, or blank line if not found
+sysprop get net.hostname unknown   # prints "unknown" if the key does not exist
+getprop ro.build.version           # same, using the getprop alias
 ```
 
 ### Write a property
 
 ```bash
 sysprop set net.hostname my-device
-setprop net.hostname my-device      # same, using the setprop alias
+setprop net.hostname my-device     # same, using the setprop alias
 ```
 
 Attempting to overwrite a `ro.*` property will fail:
 
 ```bash
 $ sysprop set ro.build.version evil
-sysprop: failed to set 'ro.build.version': read-only property
+setprop: failed to set 'ro.build.version': read-only property
 ```
 
 ### Delete a property
@@ -211,30 +204,15 @@ sysprop: failed to set 'ro.build.version': read-only property
 sysprop delete net.hostname
 ```
 
-`ro.*` properties cannot be deleted. `persist.*` properties are deleted from both
-the runtime and persistent stores.
-
-### List all properties
-
-```bash
-sysprop list
-getprop          # no arguments — same output
-```
-
-Output format (Android-compatible):
-
-```
-[net.hostname]: [my-device]
-[ro.build.version]: [1.0.0]
-[persist.wifi.ssid]: [HomeNetwork]
-```
+`ro.*` properties cannot be deleted. `persist.*` properties are deleted from
+the persistent directory on disk.
 
 ---
 
 ## Reading Properties from a Shell Script Inside a Service
 
 Because `sysprop` is a plain command-line tool, you can use it directly in
-`ExecStartPre=` lines or in shell scripts called by your service:
+`ExecStartPre=` lines or shell scripts called by your service:
 
 ```bash
 #!/bin/sh
@@ -252,7 +230,7 @@ You can also write to properties from a service to communicate state:
 sysprop set sys.myservice.ready 1
 ```
 
-Another service can then poll or check this:
+Another service can then check or poll this:
 
 ```bash
 # Wait until myservice signals it is ready (simple poll with timeout).
@@ -266,44 +244,24 @@ done
 
 ## Persistent Properties
 
-`persist.*` properties are automatically saved to `/etc/sysprop/persistent/` when
-written, and loaded back into the runtime store by `sysprop-init` at next boot.
+`persist.*` properties are stored directly in `/etc/sysprop/persistent/` and
+read directly from there by every process. They are never copied to the runtime
+tmpfs.
 
 ```bash
 # Set a persistent property — survives reboots.
 sysprop set persist.wifi.ssid "MyNetwork"
-sysprop set persist.wifi.psk  "secret"
 
-# After reboot, sysprop-init will restore these automatically.
+# Read it back (reads from the persistent directory on disk).
+sysprop get persist.wifi.ssid   # → MyNetwork
+
+# After reboot, the property is still readable with no extra boot steps.
 sysprop get persist.wifi.ssid   # → MyNetwork
 ```
 
 If the persistent directory is on a read-only filesystem when `sysprop set` is
-called, the write to `/etc/sysprop/persistent/` will fail silently — the property
-is still set in the runtime store for the current boot, but will not survive
-rebooting. A warning is printed to stderr.
-
----
-
-## Overriding Directories at Runtime
-
-You can override both directories via environment variables without recompiling.
-This is useful for development and testing:
-
-```bash
-# Point to custom directories for a single invocation
-SYSPROP_RUNTIME_DIR=/tmp/myprops \
-SYSPROP_PERSISTENT_DIR=/tmp/mypersist \
-    sysprop-init /tmp/my-build.prop
-
-# Use the same overrides when reading back
-SYSPROP_RUNTIME_DIR=/tmp/myprops sysprop list
-```
-
-The priority order for directory configuration is:
-1. `--runtime-dir` / `--persistent-dir` flags (highest priority)
-2. `SYSPROP_RUNTIME_DIR` / `SYSPROP_PERSISTENT_DIR` environment variables
-3. Compiled-in defaults (`/run/sysprop/props` and `/etc/sysprop/persistent`)
+called, the write fails and returns an error. The property is not written
+anywhere.
 
 ---
 
@@ -316,15 +274,16 @@ systemd starts
     │       │
     │       └─ sysprop-init.service
     │               1. mkdir -p /run/sysprop/props
-    │               2. Remove stale .tmp.* files from crashed writers
-    │               3. Copy persist.* from /etc/sysprop/persistent → runtime dir
-    │               4. Load /etc/sysprop/build.prop (ro.*, defaults, ...)
+    │               2. mkdir -p /etc/sysprop/persistent  (if persistence enabled)
+    │               3. Remove stale .tmp.* files from crashed writers
+    │               4. Load /etc/sysprop/build.prop (ro.*, volatile defaults)
     │               └─ exits 0
     │
     ├─ sysinit.target
     │
     ├─ your-service-a.service  (After=sysprop-init.service)
-    │       reads: sysprop get ro.hw.board
+    │       reads volatile/ro.*: sysprop get ro.hw.board
+    │       reads persist.*:     sysprop get persist.wifi.ssid  (from disk)
     │
     └─ your-service-b.service  (After=sysprop-init.service)
             reads: sysprop get net.hostname
@@ -337,8 +296,8 @@ systemd starts
 
 **`sysprop: I/O error` when reading properties**
 
-The runtime directory does not exist. Either `sysprop-init` has not run yet, or
-it failed. Check:
+The runtime directory does not exist. `sysprop-init` has not run yet or it
+failed. Check:
 
 ```bash
 systemctl status sysprop-init.service
@@ -348,25 +307,21 @@ ls /run/sysprop/props
 
 **`ro.*` property not appearing after reboot**
 
-`ro.*` properties are volatile unless you also put them in `build.prop` or the
-persistent dir. They are not automatically saved. Add them to
-`/etc/sysprop/build.prop` to ensure they are re-set on every boot.
+`ro.*` properties are volatile — they live in tmpfs and are cleared on every
+reboot. They must be listed in `/etc/sysprop/build.prop` so that `sysprop-init`
+re-sets them on every boot.
 
 **`persist.*` property not surviving reboot**
 
-Check that `/etc/sysprop/persistent/` is writable and that the corresponding file
-is present there:
+Check that `/etc/sysprop/persistent/` is writable and that the property file is
+present there:
 
 ```bash
 ls -la /etc/sysprop/persistent/
 ```
 
-If the file is missing, the write to the persistent backend failed silently. Check
-the service logs:
-
-```bash
-journalctl -u your-service.service | grep sysprop
-```
+If the file is missing, the write to the persistent backend failed. Check stderr
+output from the process that called `sysprop set`.
 
 **My service starts before properties are ready**
 

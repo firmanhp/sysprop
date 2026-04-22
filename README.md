@@ -1,56 +1,40 @@
 # sysprop
 
-A system property store for Linux embedded systems, modelled after Android's
-`getprop`/`setprop`. It provides a global, process-shared key-value store with
-support for volatile, read-only (`ro.*`), and persistent (`persist.*`) property
-classes.
+A global key-value property store for Linux embedded systems, modelled after
+Android's `getprop`/`setprop`. Processes share properties by reading and writing
+named files in a tmpfs directory — no daemon, no IPC, no shared memory.
 
 ---
 
-## Background
-
-Embedded Linux systems often need a lightweight, shared configuration
-namespace: board identifiers, runtime flags, network parameters, and similar
-values that multiple processes must read without IPC overhead.
-
-Android solves this with a memory-mapped shared region protected by seqlocks.
-Generic Linux has no equivalent. Common substitutes — environment variables,
-D-Bus properties, Redis, SQLite — are either process-local, require a daemon,
-or carry far more overhead than a simple embedded system warrants.
-
-sysprop takes a middle path: **one file per property**, stored in a tmpfs
-directory such as `/run/`. Reads are three syscalls (`open`/`read`/`close`).
-Writes are atomic via POSIX `rename(2)` on the same filesystem. No daemon, no
-shared memory segment, no external dependencies at runtime.
-
-### Property classes
+## Property classes
 
 | Key prefix | Behaviour |
 |---|---|
-| (none) | Volatile — exists in the runtime tmpfs only; lost on reboot. |
-| `ro.*` | Read-only — can be set exactly once; subsequent sets are rejected. |
-| `persist.*` | Persistent — written to both the runtime tmpfs and a persistent directory on disk; reloaded on next boot by `sysprop-init`. |
+| _(none)_ | Volatile — stored in tmpfs; lost on reboot |
+| `ro.*` | Read-only — can be set exactly once; subsequent sets are rejected |
+| `persist.*` | Persistent — stored on disk in `SYSPROP_PERSISTENT_DIR`; survives reboots |
 
-### Key format
+Only keys that begin with the literal string `ro.` are read-only. The bare key
+`ro` (no dot) is mutable.
 
-Keys use the character set `[a-zA-Z0-9._-]`, dot-separated with no empty
-segments. Maximum length is 256 bytes (configurable at build time).
+## Key format
+
+Keys use only `[a-zA-Z0-9._-]`, with dot-separated non-empty segments — no
+leading, trailing, or consecutive dots. Maximum length is 255 bytes.
 
 ---
 
 ## Prerequisites
 
-| Requirement | Version | Notes |
-|---|---|---|
-| CMake | ≥ 3.16 | |
-| C++ compiler | C++17 | GCC ≥ 8, Clang ≥ 5 recommended |
-| C compiler | C11 | Required only for the C example |
-| POSIX | — | `open`, `rename`, `readdir`, `mkdtemp` |
-| Google Test + Mock | 1.14 | Fetched automatically if not found |
-| Google Benchmark | 1.8.3 | Fetched automatically if not found |
+| Requirement | Notes |
+|---|---|
+| CMake ≥ 3.16 | |
+| C++17 compiler | GCC ≥ 8 or Clang ≥ 5 |
+| POSIX filesystem | `open`, `rename`, `readdir` |
+| Google Test 1.14 | Fetched automatically when `SYSPROP_BUILD_TESTS=ON` |
+| Google Benchmark 1.8.3 | Fetched automatically when `SYSPROP_BUILD_BENCHMARKS=ON` |
 
-Tests and benchmarks are optional. A minimal library+tools build has no
-external runtime dependencies beyond the C++ standard library.
+A library-only build has no runtime dependencies beyond the C++ standard library.
 
 ---
 
@@ -61,7 +45,7 @@ cmake -B build
 cmake --build build
 ```
 
-By default only the library and CLI tools are built. To enable optional components:
+Optional components are disabled by default:
 
 ```sh
 cmake -B build -DSYSPROP_BUILD_TESTS=ON -DSYSPROP_BUILD_BENCHMARKS=ON
@@ -77,17 +61,19 @@ cmake --build build
 | `SYSPROP_BUILD_BENCHMARKS` | `OFF` | Build Google Benchmark suite |
 | `SYSPROP_BUILD_EXAMPLES` | `OFF` | Build C and C++ usage examples |
 
-### Configurable defaults
+### Configurable paths and limits
 
-These values are baked into the library at compile time. Override them on the
-CMake command line if your target uses different paths.
+These values are baked into the library at compile time.
 
 | Cache variable | Default | Description |
 |---|---|---|
-| `SYSPROP_RUNTIME_DIR` | `/run/sysprop/props` | Where volatile properties are stored |
-| `SYSPROP_PERSISTENT_DIR` | `/etc/sysprop/persistent` | Where persistent properties are stored on disk |
-| `SYSPROP_MAX_KEY_LENGTH` | `256` | Buffer size including null terminator; max key string is 255 bytes |
-| `SYSPROP_MAX_VALUE_LENGTH` | `256` | Buffer size including null terminator; max value string is 255 bytes |
+| `SYSPROP_RUNTIME_DIR` | `/run/sysprop/props` | Where volatile and `ro.*` properties are stored |
+| `SYSPROP_PERSISTENT_DIR` | `/etc/sysprop/persistent` | Where `persist.*` properties are stored on disk |
+| `SYSPROP_MAX_KEY_LENGTH` | `256` | Buffer size including null terminator |
+| `SYSPROP_MAX_VALUE_LENGTH` | `256` | Buffer size including null terminator |
+
+Set `SYSPROP_PERSISTENT_DIR` to an empty string to disable persistence entirely.
+When disabled, `persist.*` operations fall back to the runtime backend.
 
 Example for a custom target:
 
@@ -100,12 +86,16 @@ cmake -B build \
 ### Running tests
 
 ```sh
+cmake -B build -DSYSPROP_BUILD_TESTS=ON
+cmake --build build
 cd build && ctest --output-on-failure
 ```
 
 ### Running benchmarks
 
 ```sh
+cmake -B build -DSYSPROP_BUILD_BENCHMARKS=ON
+cmake --build build
 ./build/benchmarks/sysprop_benchmark
 ```
 
@@ -117,12 +107,12 @@ cd build && ctest --output-on-failure
 cmake --install build --prefix /usr/local
 ```
 
-This installs:
+This installs the CLI tools and symlinks:
 
-- `${prefix}/bin/sysprop` — busybox-style CLI (`sysprop get`, `sysprop set`, `sysprop delete`, `sysprop list`)
-- `${prefix}/bin/sysprop-init` — boot-time property loader
-- `${prefix}/bin/getprop` → symlink to `sysprop`
-- `${prefix}/bin/setprop` → symlink to `sysprop`
+- `${prefix}/bin/sysprop`
+- `${prefix}/bin/sysprop-init`
+- `${prefix}/bin/getprop` → `sysprop`
+- `${prefix}/bin/setprop` → `sysprop`
 
 Use `DESTDIR` for staged installs (e.g. when building a sysroot image):
 
@@ -130,178 +120,111 @@ Use `DESTDIR` for staged installs (e.g. when building a sysroot image):
 cmake --install build --prefix /usr DESTDIR=/path/to/staging
 ```
 
-### Boot-time setup
-
-Add `sysprop-init` to your init sequence (before any service that reads
-properties). A minimal invocation:
-
-```sh
-# Creates the runtime directory and loads any persist.* properties from disk.
-sysprop-init
-
-# Optionally load a defaults file (key=value lines; # introduces a comment).
-sysprop-init /etc/sysprop/defaults.prop
-```
-
-`sysprop-init` also removes stale `.tmp.*` files left by writers that crashed
-mid-write, preventing stale data from surviving across reboots.
-
-### CLI usage
-
-```sh
-# Get a property (prints empty line if missing, like Android getprop)
-getprop ro.build.version
-sysprop get ro.build.version
-
-# Get with a fallback default
-getprop missing.key "fallback-value"
-sysprop get missing.key "fallback-value"
-
-# Set a property
-setprop device.name my-board
-sysprop set device.name my-board
-
-# Delete a property
-sysprop delete device.name
-
-# List all properties in [key]: [value] format
-getprop
-sysprop list
-```
-
-Runtime and persistent directories can be overridden per-invocation with
-environment variables:
-
-```sh
-SYSPROP_RUNTIME_DIR=/tmp/test sysprop get device.name
-```
+`cmake --install` installs only the CLI tools. The library (`libsysprop.a`) and
+headers are not installed; see [INTERNALS.md](INTERNALS.md) for how to consume
+the library from a non-CMake build system.
 
 ---
 
-## Incorporating into an existing project
+## Boot-time setup
 
-### Option A — CMake FetchContent (recommended)
-
-Add to your `CMakeLists.txt`:
-
-```cmake
-include(FetchContent)
-FetchContent_Declare(
-    sysprop
-    GIT_REPOSITORY https://github.com/yourorg/sysprop.git
-    GIT_TAG        main
-    GIT_SHALLOW    TRUE
-)
-FetchContent_MakeAvailable(sysprop)
-
-# Link your target against the library
-target_link_libraries(my_app PRIVATE sysprop)
-```
-
-Tests, benchmarks, tools, and examples all default to `OFF`, so no additional
-options are needed when consuming the library as a dependency. The library's
-public include directory (`include/`) is propagated automatically via
-`target_include_directories(sysprop PUBLIC ...)`, so no additional
-`include_directories` call is needed.
-
-#### Installing the CLI tools alongside your project
-
-`SYSPROP_BUILD_TOOLS` defaults to `ON`, so the `sysprop` and `sysprop-init`
-binaries are built automatically when you use FetchContent. Their install rules
-are registered with your parent project, so a single `cmake --install` deploys
-everything together:
-
-```cmake
-include(FetchContent)
-FetchContent_Declare(
-    sysprop
-    GIT_REPOSITORY https://github.com/yourorg/sysprop.git
-    GIT_TAG        main
-    GIT_SHALLOW    TRUE
-)
-# SYSPROP_BUILD_TOOLS is ON by default — listed here for clarity.
-set(SYSPROP_BUILD_TOOLS ON CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(sysprop)
-
-target_link_libraries(my_app PRIVATE sysprop)
-```
-
-Build and install:
+`sysprop-init` must run before any process that reads or writes properties. It
+creates the runtime directory, removes stale temp files left by a previous
+crash, and optionally loads a defaults file:
 
 ```sh
-cmake -B build
-cmake --build build
-cmake --install build --prefix /usr/local
+# Minimal: create the runtime directory only.
+sysprop-init
+
+# Load factory defaults (key=value lines; # introduces a comment).
+sysprop-init /etc/sysprop/build.prop
 ```
 
-This installs your project's own targets **and**:
+`sysprop-init` also creates the persistent directory if persistence is enabled.
+`persist.*` properties are read directly from the persistent directory — they do
+not need to be copied anywhere on boot.
 
-- `/usr/local/bin/sysprop`
-- `/usr/local/bin/sysprop-init`
-- `/usr/local/bin/getprop` → symlink to `sysprop`
-- `/usr/local/bin/setprop` → symlink to `sysprop`
+For systemd integration, see [SYSTEMD.md](SYSTEMD.md).
 
-To include the tools in the build but exclude them from `cmake --install`,
-use CMake's component mechanism or set `SYSPROP_BUILD_TOOLS=OFF` and build
-them separately as shown in the standalone [Installation](#installation) section.
+---
 
-### Option B — manual build tree reference
-
-The current build does not install the library or headers — `cmake --install`
-only installs the CLI tools. To consume the library from a non-CMake build
-system, build the project first and reference the artifacts directly:
+## CLI usage
 
 ```sh
-cmake -B /tmp/sysprop-build \
-    -DSYSPROP_BUILD_TESTS=OFF \
-    -DSYSPROP_BUILD_BENCHMARKS=OFF \
-    -DSYSPROP_BUILD_TOOLS=OFF \
-    -DSYSPROP_BUILD_EXAMPLES=OFF
-cmake --build /tmp/sysprop-build
+# Get a property (prints a blank line if not found)
+sysprop get ro.build.version
+getprop ro.build.version
+
+# Get with a fallback default
+sysprop get missing.key "default-value"
+getprop missing.key "default-value"
+
+# Set a property
+sysprop set device.name my-board
+setprop device.name my-board
+
+# Delete a property
+sysprop delete device.name
 ```
 
-Then point your compiler at the build output:
+`getprop` and `setprop` are symlinks to `sysprop`.
 
-```sh
-# C
-cc -I/path/to/sysprop/include main.c \
-   /tmp/sysprop-build/src/libsysprop.a -o my_app
+`ro.*` properties cannot be overwritten or deleted. `persist.*` properties are
+written to and read from the persistent directory on disk.
 
-# C++
-c++ -std=c++17 -I/path/to/sysprop/include main.cpp \
-   /tmp/sysprop-build/src/libsysprop.a -o my_app
+---
+
+## Library API
+
+The library auto-initializes before `main()` runs, using the paths baked in at
+build time. No explicit init call is needed.
+
+```c
+#include <sysprop/sysprop.h>
 ```
 
-> If you need `cmake --install` to deploy the library and headers, install
-> rules for `sysprop` and `include/` would need to be added to
-> `src/CMakeLists.txt` first.
+### Core functions
 
-### C usage
+```c
+// Read a property into the caller-provided buffer.
+// On success: returns bytes written (>= 0); buf is null-terminated.
+// On failure: returns a negative error code.
+int sysprop_get(const char* key, char* buf, size_t buf_len);
 
-The runtime (and persistent) directories must exist before the first `Set`
-call — the library does not create them. In production the `sysprop-init`
-binary handles this at boot time. For application-level use, create the
-directories explicitly before calling `sysprop_init`.
+// Set a property. Returns SYSPROP_OK (0) or a negative error code.
+int sysprop_set(const char* key, const char* value);
+
+// Delete a property. Returns SYSPROP_ERR_NOT_FOUND if absent.
+int sysprop_delete(const char* key);
+
+// Translate an error code to a human-readable string.
+const char* sysprop_error_string(int err);
+```
+
+### Typed helpers
+
+```c
+// Return default_value if the property is absent or unparseable.
+int64_t sysprop_get_int(const char* key, int64_t default_value);
+int     sysprop_get_bool(const char* key, int default_value);  /* returns 0 or 1 */
+float   sysprop_get_float(const char* key, float default_value);
+```
+
+`sysprop_get_bool` recognises `"1"`, `"true"`, `"yes"`, `"on"` as true and
+`"0"`, `"false"`, `"no"`, `"off"` as false.
+
+### C example
 
 ```c
 #include <stdio.h>
-#include <sys/stat.h>
 #include <sysprop/sysprop.h>
 
 int main(void) {
-    /* Create runtime directory if it does not exist. */
-    mkdir("/run/myapp/props", 0755);
-
-    sysprop_config_t cfg;
-    cfg.runtime_dir        = "/run/myapp/props";
-    cfg.persistent_dir     = "/data/myapp/props";
-    cfg.enable_persistence = 0;  /* set to 1 once persistent dir also exists */
-    sysprop_init(&cfg);
-
+    /* Runtime directory must exist before Set() (sysprop-init creates it). */
     sysprop_set("device.name", "my-board");
     sysprop_set("ro.build.version", "1.0.0");
 
-    char buf[SYSPROP_MAX_VALUE_LENGTH];   /* includes null terminator */
+    char buf[SYSPROP_MAX_VALUE_LENGTH];
     if (sysprop_get("device.name", buf, sizeof(buf)) >= 0)
         printf("device.name = %s\n", buf);
 
@@ -313,46 +236,40 @@ int main(void) {
 }
 ```
 
-### C++ usage
-
-The same directory pre-existence requirement applies. See `examples/cpp_example/main.cpp`
-for a self-contained runnable example that uses `/tmp` paths.
+### C++ example
 
 ```cpp
 #include <array>
 #include <cstdio>
-#include <sys/stat.h>
+#include <string>
 #include <sysprop/sysprop.h>
 
 int main() {
-    mkdir("/run/myapp/props", 0755);
-
-    sysprop_config_t cfg;
-    cfg.runtime_dir        = "/run/myapp/props";
-    cfg.persistent_dir     = "/data/myapp/props";
-    cfg.enable_persistence = 0;
-    sysprop_init(&cfg);
-
     sysprop_set("device.name", "my-board");
     sysprop_set("ro.build.version", "1.0.0");
 
-    std::array<char, SYSPROP_MAX_VALUE_LENGTH> buf{};  // includes null terminator
+    std::array<char, SYSPROP_MAX_VALUE_LENGTH> buf{};
     if (sysprop_get("device.name", buf.data(), buf.size()) >= 0)
         std::printf("device.name = %s\n", buf.data());
 
-    std::printf("int    = %d\n",   sysprop_get_int("missing.int", 42));
-    std::printf("bool   = %s\n",   sysprop_get_bool("missing.bool", 0) ? "true" : "false");
-    std::printf("float  = %.2f\n", sysprop_get_float("missing.float", 3.14f));
+    /* Typed helpers with defaults. */
+    int64_t n = sysprop_get_int("missing.int", 42);
+    int     b = sysprop_get_bool("missing.bool", 0);   /* 0 or 1 */
+    float   f = sysprop_get_float("missing.float", 3.14f);
 
-    int rc = sysprop_set("ro.build.version", "2.0.0");
-    std::printf("%s\n", sysprop_error_string(rc));  // "read-only property"
+    /* C++ string overload (defined in the header). */
+    std::string v = sysprop_get("device.name", std::string{"unknown"});
+
+    /* ro.* is write-once. */
+    std::printf("%s\n", sysprop_error_string(sysprop_set("ro.build.version", "2.0.0")));
 }
 ```
 
 ### Error handling
 
-All functions return an `int`. Zero (`SYSPROP_OK`) is success; negative values
-are errors. Callers may check or ignore return values as appropriate.
+All functions return `int`. Zero (`SYSPROP_OK`) is success; negative values are
+errors. `sysprop_get` returns the byte count (≥ 0) on success, so callers must
+check `>= 0`, not `== SYSPROP_OK`.
 
 ```c
 int rc = sysprop_set("ro.x", "v");
@@ -362,29 +279,49 @@ if (rc != SYSPROP_OK)
 
 ---
 
-## Project structure
+## CMake integration
 
+### FetchContent (recommended)
+
+```cmake
+include(FetchContent)
+FetchContent_Declare(
+    sysprop
+    GIT_REPOSITORY https://github.com/yourorg/sysprop.git
+    GIT_TAG        main
+    GIT_SHALLOW    TRUE
+)
+FetchContent_MakeAvailable(sysprop)
+
+target_link_libraries(my_app PRIVATE sysprop)
 ```
-sysprop/
-├── include/sysprop/
-│   └── sysprop.h          # Single public header (C and C++)
-├── src/
-│   ├── backend.h          # Abstract storage backend (internal)
-│   ├── file_backend.h/.cpp
-│   ├── property_store.h/.cpp
-│   ├── validation.h/.cpp
-│   └── sysprop.cpp        # Public API implementation
-├── tools/
-│   ├── sysprop_main.cpp   # Busybox-style CLI (getprop / setprop / sysprop)
-│   └── sysprop_init.cpp   # Boot-time property loader
-├── tests/
-│   ├── validation_test.cpp
-│   ├── file_backend_test.cpp
-│   ├── property_store_test.cpp
-│   └── integration_test.cpp
-├── benchmarks/
-│   └── sysprop_benchmark.cpp
-└── examples/
-    ├── c_example/main.c
-    └── cpp_example/main.cpp
+
+Tests, benchmarks, and examples default to `OFF` — no extra options needed.
+`SYSPROP_BUILD_TOOLS` defaults to `ON`, so the CLI tools are built and their
+install rules are registered with the parent project. To suppress them:
+
+```cmake
+set(SYSPROP_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(sysprop)
+```
+
+### Manual build tree
+
+Build with tools disabled, then reference the artifacts directly:
+
+```sh
+cmake -B /tmp/sysprop-build \
+    -DSYSPROP_BUILD_TOOLS=OFF \
+    -DSYSPROP_BUILD_TESTS=OFF
+cmake --build /tmp/sysprop-build
+```
+
+```sh
+# C
+cc -I/path/to/sysprop/include main.c \
+   /tmp/sysprop-build/src/libsysprop.a -o my_app
+
+# C++
+c++ -std=c++17 -I/path/to/sysprop/include main.cpp \
+   /tmp/sysprop-build/src/libsysprop.a -o my_app
 ```
