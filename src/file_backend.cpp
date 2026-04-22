@@ -69,7 +69,9 @@ int FileBackend::Get(const char* key, char* buf, std::size_t buf_len) {
 
   const UniqueFd fd = OpenReadOnly(path);
   if (!fd.valid()) {
-    return (errno == ENOENT) ? SYSPROP_ERR_NOT_FOUND : SYSPROP_ERR_IO;
+    if (errno == ENOENT) { return SYSPROP_ERR_NOT_FOUND; }
+    if (errno == EACCES || errno == EPERM) { return SYSPROP_ERR_PERMISSION; }
+    return SYSPROP_ERR_IO;
   }
 
   // Read at most buf_len - 1 bytes to leave room for the null terminator.
@@ -98,6 +100,7 @@ int FileBackend::Set(const char* key, const char* value) {
   {
     const UniqueFd fd = OpenWriteNew(tmp_path);
     if (!fd.valid()) {
+      if (errno == EACCES || errno == EPERM) { return SYSPROP_ERR_PERMISSION; }
       return SYSPROP_ERR_IO;
     }
 
@@ -112,6 +115,7 @@ int FileBackend::Set(const char* key, const char* value) {
   // Atomic commit: rename is guaranteed atomic on the same filesystem.
   if (::rename(tmp_path, final_path) < 0) {
     ::unlink(tmp_path);
+    if (errno == EACCES || errno == EPERM) { return SYSPROP_ERR_PERMISSION; }
     return SYSPROP_ERR_IO;
   }
 
@@ -125,7 +129,9 @@ int FileBackend::Delete(const char* key) {
   }
 
   if (::unlink(path) < 0) {
-    return (errno == ENOENT) ? SYSPROP_ERR_NOT_FOUND : SYSPROP_ERR_IO;
+    if (errno == ENOENT) { return SYSPROP_ERR_NOT_FOUND; }
+    if (errno == EACCES || errno == EPERM) { return SYSPROP_ERR_PERMISSION; }
+    return SYSPROP_ERR_IO;
   }
   return SYSPROP_OK;
 }
@@ -136,7 +142,9 @@ int FileBackend::Exists(const char* key) {
     return SYSPROP_ERR_IO;
   }
 
-  return (::access(path, F_OK) == 0) ? SYSPROP_OK : SYSPROP_ERR_NOT_FOUND;
+  if (::access(path, F_OK) == 0) { return SYSPROP_OK; }
+  if (errno == EACCES || errno == EPERM) { return SYSPROP_ERR_PERMISSION; }
+  return SYSPROP_ERR_NOT_FOUND;
 }
 
 }  // namespace sysprop::internal

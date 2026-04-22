@@ -23,8 +23,9 @@ using sysprop::internal::PropertyStore;
 //
 // Constructed once via __attribute__((constructor)) before main() runs.
 // Directories and persistence are baked in at compile time via CMake.
-// GetStore() still null-checks for safety, but in normal usage s_instance
-// is always set before any C function executes.
+// GetStore() returns nullptr only when both s_store_override and s_instance
+// are null — impossible after sysprop_auto_init() runs. Call sites dereference
+// the result directly; the null branch is unreachable in practice.
 //
 // Thread safety: the constructor attribute runs before any threads are started.
 // Concurrent property access after init is safe because FileBackend operations
@@ -91,6 +92,8 @@ const char* sysprop_error_string(int err) {
       return "I/O error";
     case SYSPROP_ERR_PERMISSION:
       return "permission denied";
+    case SYSPROP_ERR_INVALID_VALUE:
+      return "invalid value";
     case SYSPROP_ERR_BUFFER_TOO_SMALL:
       return "buffer too small";
     default:
@@ -110,7 +113,7 @@ int sysprop_delete(const char* key) {
   return GetStore()->Delete(key);
 }
 
-int sysprop_get_int(const char* key, int default_value) {
+int64_t sysprop_get_int(const char* key, int64_t default_value) {
   char buf[SYSPROP_MAX_VALUE_LENGTH];
   if (GetStore()->Get(key, buf, sizeof(buf)) < 0) {
     return default_value;
@@ -122,7 +125,7 @@ int sysprop_get_int(const char* key, int default_value) {
   if (end == buf || errno != 0) {
     return default_value;
   }
-  return static_cast<int>(val);
+  return val;
 }
 
 int sysprop_get_bool(const char* key, int default_value) {

@@ -13,9 +13,11 @@
 
 #ifdef __cplusplus
 #  include <cstddef>
+#  include <cstdint>
 #  include <string>
 #else
 #  include <stddef.h>
+#  include <stdint.h>
 #endif
 
 // ── Configurable compile-time defaults ────────────────────────────────────────
@@ -49,6 +51,7 @@
 #define SYSPROP_ERR_KEY_TOO_LONG     (-5)
 #define SYSPROP_ERR_IO               (-6)
 #define SYSPROP_ERR_PERMISSION       (-7)
+#define SYSPROP_ERR_INVALID_VALUE    (-8)
 #define SYSPROP_ERR_BUFFER_TOO_SMALL (-9)
 
 // ── API ───────────────────────────────────────────────────────────────────────
@@ -75,7 +78,7 @@ int sysprop_set(const char* key, const char* value);
 int sysprop_delete(const char* key);
 
 // Typed helpers. Return default_value if the property is absent or unparseable.
-int   sysprop_get_int(const char* key, int default_value);
+int64_t sysprop_get_int(const char* key, int64_t default_value);
 int   sysprop_get_bool(const char* key, int default_value);  /* returns 0 or 1 */
 float sysprop_get_float(const char* key, float default_value);
 

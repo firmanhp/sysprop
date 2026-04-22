@@ -160,15 +160,15 @@ TEST(ValidateValue, RejectsTooLong) {
 }
 
 TEST(ValidateValue, RejectsEmbeddedNull) {
-  EXPECT_EQ(SYSPROP_ERR_INVALID_KEY, ValidateValue(std::string_view("hel\0lo", 6)));
+  EXPECT_EQ(SYSPROP_ERR_INVALID_VALUE, ValidateValue(std::string_view("hel\0lo", 6)));
 }
 
 TEST(ValidateValue, RejectsNullByteAtStart) {
-  EXPECT_EQ(SYSPROP_ERR_INVALID_KEY, ValidateValue(std::string_view("\0value", 6)));
+  EXPECT_EQ(SYSPROP_ERR_INVALID_VALUE, ValidateValue(std::string_view("\0value", 6)));
 }
 
 TEST(ValidateValue, RejectsNullByteAtEnd) {
-  EXPECT_EQ(SYSPROP_ERR_INVALID_KEY, ValidateValue(std::string_view("value\0", 6)));
+  EXPECT_EQ(SYSPROP_ERR_INVALID_VALUE, ValidateValue(std::string_view("value\0", 6)));
 }
 
 TEST(ValidateValue, AcceptsSpacesAndPunctuation) {

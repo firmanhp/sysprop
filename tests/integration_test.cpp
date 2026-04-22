@@ -251,6 +251,7 @@ TEST(ErrorString, CoversAllCodes) {
   EXPECT_STREQ("key too long", sysprop_error_string(SYSPROP_ERR_KEY_TOO_LONG));
   EXPECT_STREQ("I/O error", sysprop_error_string(SYSPROP_ERR_IO));
   EXPECT_STREQ("permission denied", sysprop_error_string(SYSPROP_ERR_PERMISSION));
+  EXPECT_STREQ("invalid value", sysprop_error_string(SYSPROP_ERR_INVALID_VALUE));
   EXPECT_STREQ("buffer too small", sysprop_error_string(SYSPROP_ERR_BUFFER_TOO_SMALL));
   EXPECT_STREQ("unknown error", sysprop_error_string(-999));
 }

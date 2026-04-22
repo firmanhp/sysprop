@@ -44,7 +44,7 @@ int ValidateValue(std::string_view value) noexcept {
   }
   // Values are stored as plain-text files; embedded nulls are not supported.
   if (value.find('\0') != std::string_view::npos) {
-    return SYSPROP_ERR_INVALID_KEY;
+    return SYSPROP_ERR_INVALID_VALUE;
   }
   return SYSPROP_OK;
 }
