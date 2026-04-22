@@ -45,7 +45,7 @@ int ValidateValue(std::string_view value) noexcept {
   // Values are stored as plain-text files; embedded nulls are not supported.
   if (value.find('\0') != std::string_view::npos) {
     return SYSPROP_ERR_INVALID_KEY;
-  }  // NOLINT(abseil-string-find-str-contains) -- no Abseil dependency in this project
+  }
   return SYSPROP_OK;
 }
 

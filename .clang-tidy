@@ -40,6 +40,14 @@
 #
 # -llvmlibc-*, -altera-*, -fuchsia-*, -android-*, -linuxkernel-*:
 #   Platform/framework-specific check suites not relevant to this project.
+#
+# -abseil-*:
+#   No Abseil dependency. All abseil-* checks (e.g. abseil-string-find-str-contains)
+#   recommend Abseil APIs that are not available in this project.
+#
+# -llvm-header-guard:
+#   The codebase uses #pragma once throughout; the llvm-header-guard check
+#   enforces #ifndef-style guards which would be inconsistent and more fragile.
 
 Checks: >-
   *,
@@ -60,6 +68,8 @@ Checks: >-
   -fuchsia-*,
   -android-*,
   -linuxkernel-*,
+  -abseil-*,
+  -llvm-header-guard,
 
 # Treat warnings as errors in CI — remove WarningsAsErrors to allow
 # advisory-only runs during development.

@@ -1,4 +1,4 @@
-// sysprop — System property store: C and C++ interface. // NOLINT(llvm-header-guard) -- #pragma once is used throughout; llvm-header-guard requires #ifndef-style guards
+// sysprop — System property store: C and C++ interface.
 //
 // A single header usable from both C and C++.
 //
