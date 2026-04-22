@@ -28,10 +28,6 @@ class PropertyStore {
 
   // Iterate over all properties. Visitor returns false to stop early.
   [[nodiscard]] virtual int ForEach(Visitor fn) = 0;
-
-  // Load non-persist keys from the persistent backend into runtime (e.g., factory ro.*).
-  // No-op if no persistent backend. Returns count of loaded properties.
-  [[nodiscard]] virtual int LoadPersistentProperties() = 0;
 };
 
 }  // namespace sysprop::internal

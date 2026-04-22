@@ -104,32 +104,4 @@ int FilePropertyStore::ForEach(Visitor fn) {
   return persistent_->ForEach(pv);
 }
 
-int FilePropertyStore::SetRuntimeOnly(const char* key, const char* value) {
-  return runtime_->Set(key, value);
-}
-
-int FilePropertyStore::LoadPersistentProperties() {
-  if (persistent_ == nullptr) {
-    return 0;
-  }
-
-  int load_count = 0;
-  auto fn = [&](const char* key, const char* value) {
-    // persist.* keys are accessed directly from persistent_; skip loading into runtime_.
-    if (StartsWith(key, kPersistPrefix)) {
-      return true;
-    }
-    if (SetRuntimeOnly(key, value) == SYSPROP_OK) {
-      ++load_count;
-    } else {
-      (void)std::fprintf(stderr, "sysprop: warning: failed to load persistent property '%s'\n",
-                         key);
-    }
-    return true;
-  };
-  (void)persistent_->ForEach(MakeVisitor(fn));
-
-  return load_count;
-}
-
 }  // namespace sysprop::internal

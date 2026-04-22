@@ -69,8 +69,6 @@ class MockPropertyStore final : public sysprop::internal::PropertyStore {
     return SYSPROP_OK;
   }
 
-  int LoadPersistentProperties() override { return 0; }
-
  private:
   std::unordered_map<std::string, std::string> map_;
   sysprop::internal::PropertyStore* prev_;

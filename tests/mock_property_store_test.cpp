@@ -98,11 +98,6 @@ TEST(MockPropertyStoreTest, ForEachEarlyStop) {
   EXPECT_EQ(1, count);
 }
 
-TEST(MockPropertyStoreTest, LoadPersistentPropertiesReturnsZero) {
-  MockPropertyStore mock;
-  EXPECT_EQ(0, mock.LoadPersistentProperties());
-}
-
 // ── RAII injection — sysprop_xxx() hits the mock ─────────────────────────────
 
 TEST(MockPropertyStoreTest, SyspropSetAndGetHitMock) {

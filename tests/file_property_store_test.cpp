@@ -228,15 +228,6 @@ TEST_F(FilePropertyStoreTest, PersistDeleteAndRecreateUpdatesBackend) {
   EXPECT_TRUE(FileExists(ps_dir_, "persist.cfg"));
 }
 
-TEST_F(FilePropertyStoreTest, RoPropertyLoadedFromPersistentBecomesImmutable) {
-  ASSERT_EQ(SYSPROP_OK, ps_backend_.Set("ro.hw.sku", "prod-001"));
-  EXPECT_GT(store_.LoadPersistentProperties(), 0);
-  EXPECT_EQ(SYSPROP_ERR_READ_ONLY, store_.Set("ro.hw.sku", "evil"));
-  const int n = store_.Get("ro.hw.sku", buf_, sizeof(buf_));
-  ASSERT_GE(n, 0);
-  EXPECT_STREQ("prod-001", buf_);
-}
-
 TEST_F(FilePropertyStoreTest, RoPropertySetOnce) {
   EXPECT_EQ(SYSPROP_OK, store_.Set("ro.build.version", "42"));
   const int n = store_.Get("ro.build.version", buf_, sizeof(buf_));
@@ -316,13 +307,6 @@ TEST_F(FilePropertyStoreTest, NoPersistentBackendStillWorks) {
   EXPECT_FALSE(FileExists(ps_dir_, "persist.wifi.ssid"));
 }
 
-// ── LoadPersistentProperties ──────────────────────────────────────────────────
-
-TEST_F(FilePropertyStoreTest, LoadPersistentPropertiesIsNoopWithoutPersistentBackend) {
-  FilePropertyStore no_ps{&rt_backend_, nullptr};
-  EXPECT_EQ(0, no_ps.LoadPersistentProperties());
-}
-
 TEST_F(FilePropertyStoreTest, PersistPropertiesAccessibleWithoutLoading) {
   ASSERT_EQ(SYSPROP_OK, ps_backend_.Set("persist.a", "1"));
   ASSERT_EQ(SYSPROP_OK, ps_backend_.Set("persist.b", "2"));
@@ -330,11 +314,6 @@ TEST_F(FilePropertyStoreTest, PersistPropertiesAccessibleWithoutLoading) {
   const int n = store_.Get("persist.a", buf_, sizeof(buf_));
   ASSERT_GE(n, 0);
   EXPECT_STREQ("1", buf_);
-}
-
-TEST_F(FilePropertyStoreTest, LoadPersistentPropertiesSkipsPersistKeys) {
-  ASSERT_EQ(SYSPROP_OK, ps_backend_.Set("persist.a", "1"));
-  EXPECT_EQ(0, store_.LoadPersistentProperties());
 }
 
 // ── ForEach error propagation ─────────────────────────────────────────────────

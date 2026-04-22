@@ -47,7 +47,7 @@ src/validation.cpp/h                    ← key/value validation only
 
 **`ro.*` policy uses `Exists()` check**, not filesystem permissions. Bare `ro` (no dot) is mutable. Only keys starting with `"ro."` are read-only.
 
-**`persist.*` operations go directly to persistent backend.** Get/Set/Delete/Exists for `persist.*` keys bypass the runtime backend entirely. If no persistent backend is configured, operations fall back to runtime. `LoadPersistentProperties()` skips `persist.*` keys (accessed directly) but loads other persistent keys (e.g. factory `ro.*`) into runtime.
+**`persist.*` operations go directly to persistent backend.** Get/Set/Delete/Exists for `persist.*` keys bypass the runtime backend entirely. If no persistent backend is configured, operations fall back to runtime.
 
 ## Public API Conventions
 

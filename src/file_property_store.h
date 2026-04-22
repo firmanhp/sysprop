@@ -27,11 +27,8 @@ class FilePropertyStore final : public PropertyStore {
   [[nodiscard]] int Delete(const char* key) override;
   [[nodiscard]] int Exists(const char* key) override;
   [[nodiscard]] int ForEach(Visitor fn) override;
-  [[nodiscard]] int LoadPersistentProperties() override;
 
  private:
-  [[nodiscard]] int SetRuntimeOnly(const char* key, const char* value);
-
   FileBackend* runtime_;
   FileBackend* persistent_;  // may be null
 };

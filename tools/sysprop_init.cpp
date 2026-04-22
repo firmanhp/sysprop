@@ -3,8 +3,7 @@
 // Responsibilities:
 //   1. Create the runtime property directory (mkdir -p equivalent).
 //   2. Remove stale .tmp.* files left by crashed writers.
-//   3. Load persistent properties from the persistent dir into the runtime dir.
-//   4. Optionally load a build.prop-style defaults file (key=value per line;
+//   3. Optionally load a build.prop-style defaults file (key=value per line;
 //      lines starting with '#' are comments).
 //
 // Usage:
@@ -52,15 +51,8 @@ int main(int argc, char* argv[]) {
 
   FilePropertyStore store{&runtime_backend, persistent_backend.get()};
 
-  // 3. Load persistent properties.
+  // 3. Load defaults file (optional).
   int total_loaded = 0;
-  if (args.enable_persistence && persistent_backend != nullptr) {
-    const int n = store.LoadPersistentProperties();
-    std::fprintf(stderr, "sysprop-init: loaded %d persistent properties\n", n);
-    total_loaded += n;
-  }
-
-  // 4. Load defaults file (optional).
   if (args.defaults_file != nullptr) {
     const int n = sysprop::tools::LoadDefaultsFile(args.defaults_file, store);
     if (n < 0) return 1;

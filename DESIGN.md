@@ -94,7 +94,6 @@ float GetFloat(const char* key, float default_value);
 
 **Internal-only API** (in `src/`, used by tools but not exposed in public headers):
 - `int List(...)` — used by `sysprop list` / `getprop` with no args
-- `int LoadPersistentProperties()` — used by `sysprop-init`
 
 ---
 
@@ -184,7 +183,6 @@ Note: `backend.h` is internal (in `src/`), not part of the public API. The publi
   - `Set()`: validates key/value, enforces `ro.*` (check `Exists()` first, refuse overwrite), calls `runtime_backend->Set()`, then for `persist.*` also calls `persistent_backend->Set()` (failure is non-fatal, logged to stderr)
   - `Get()`: validates key, delegates to `runtime_backend->Get()`
   - `Delete()`: blocked for `ro.*`, cascades to persistent for `persist.*`
-  - `LoadPersistentProperties()`: lists persistent backend, sets each into runtime
 - **`tests/property_store_test.cpp`** — gmock `MockBackend` for policy unit tests
 
 ### Step 6: Public API
