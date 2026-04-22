@@ -52,22 +52,9 @@ void CleanupTmpFiles(const char* dir) {
 
 InitArgs ParseInitArgs(int argc, char* argv[]) {
   InitArgs args;
-  if (const char* rd = std::getenv("SYSPROP_RUNTIME_DIR")) {
-    args.runtime_dir = rd;
-  }  // NOLINT(concurrency-mt-unsafe)
-  if (const char* pd = std::getenv("SYSPROP_PERSISTENT_DIR")) {
-    args.persistent_dir = pd;
-  }  // NOLINT(concurrency-mt-unsafe)
-
   for (int i = 1; i < argc; ++i) {
     const std::string_view arg{argv[i]};
-    if (arg == "--runtime-dir" && i + 1 < argc) {
-      args.runtime_dir = argv[++i];
-    } else if (arg == "--persistent-dir" && i + 1 < argc) {
-      args.persistent_dir = argv[++i];
-    } else if (arg == "--no-persistence") {
-      args.enable_persistence = false;
-    } else if (arg.substr(0, 2) != "--") {
+    if (arg.substr(0, 2) != "--") {
       args.defaults_file = argv[i];
     } else {
       std::cerr << "sysprop-init: unknown option: " << argv[i] << '\n';

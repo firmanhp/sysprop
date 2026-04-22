@@ -7,12 +7,11 @@
 //      lines starting with '#' are comments).
 //
 // Usage:
-//   sysprop-init [--runtime-dir DIR] [--persistent-dir DIR]
-//               [--no-persistence] [defaults-file]
+//   sysprop-init [defaults-file]
 //
-// Environment overrides (same as the sysprop CLI):
-//   SYSPROP_RUNTIME_DIR
-//   SYSPROP_PERSISTENT_DIR
+// Directory paths and persistence are baked in at build time via CMake cache
+// variables: SYSPROP_RUNTIME_DIR, SYSPROP_PERSISTENT_DIR,
+// SYSPROP_ENABLE_PERSISTENCE.
 
 #include <cstdio>
 #include <memory>
@@ -37,16 +36,16 @@ int main(int argc, char* argv[]) {
   const InitArgs args = ParseInitArgs(argc, argv);
 
   // 1. Create runtime directory.
-  if (!MkdirP(args.runtime_dir)) return 1;
+  if (!MkdirP(SYSPROP_RUNTIME_DIR)) return 1;
 
   // 2. Remove stale temp files from previous crashes.
-  CleanupTmpFiles(args.runtime_dir);
+  CleanupTmpFiles(SYSPROP_RUNTIME_DIR);
 
-  FileBackend runtime_backend{args.runtime_dir};
+  FileBackend runtime_backend{SYSPROP_RUNTIME_DIR};
   std::unique_ptr<FileBackend> persistent_backend;
-  if (args.enable_persistence) {
-    if (!MkdirP(args.persistent_dir)) return 1;
-    persistent_backend = std::make_unique<FileBackend>(args.persistent_dir);
+  if (SYSPROP_ENABLE_PERSISTENCE) {
+    if (!MkdirP(SYSPROP_PERSISTENT_DIR)) return 1;
+    persistent_backend = std::make_unique<FileBackend>(SYSPROP_PERSISTENT_DIR);
   }
 
   FilePropertyStore store{&runtime_backend, persistent_backend.get()};

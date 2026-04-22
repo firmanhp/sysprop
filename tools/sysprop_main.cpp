@@ -5,12 +5,11 @@
 //   argv[0] == "setprop"  →  do_setprop
 //   argv[0] == "sysprop"  →  dispatch on argv[1] (get / set / delete)
 //
-// Environment overrides:
-//   SYSPROP_RUNTIME_DIR    — override the runtime property directory
-//   SYSPROP_PERSISTENT_DIR — override the persistent property directory
+// Directory paths and persistence are baked in at build time via CMake cache
+// variables: SYSPROP_RUNTIME_DIR, SYSPROP_PERSISTENT_DIR,
+// SYSPROP_ENABLE_PERSISTENCE.
 
 #include <cstdio>
-#include <cstdlib>
 #include <cstring>
 #include <memory>
 #include <string_view>
@@ -31,34 +30,13 @@ const char* ProgName(const char* argv0) noexcept {
   return p != nullptr ? p + 1 : argv0;
 }
 
-struct ToolConfig {
-  const char* runtime_dir    = SYSPROP_RUNTIME_DIR;
-  const char* persistent_dir = SYSPROP_PERSISTENT_DIR;
-  bool enable_persistence    = true;
-};
-
-ToolConfig ConfigFromEnv() {
-  ToolConfig cfg;
-  if (const char* rd = std::getenv("SYSPROP_RUNTIME_DIR")) {
-    cfg.runtime_dir = rd;
-  }
-  if (const char* pd = std::getenv("SYSPROP_PERSISTENT_DIR")) {
-    cfg.persistent_dir = pd;
-  }
-  return cfg;
-}
-
 void PrintUsage(const char* prog) {
   std::fprintf(stderr,
                "Usage:\n"
                "  %s get key [default]  -- print property value\n"
                "  %s set key value      -- set a property\n"
-               "  %s delete key         -- delete a property\n"
-               "\n"
-               "Environment:\n"
-               "  SYSPROP_RUNTIME_DIR     override runtime directory    (default: %s)\n"
-               "  SYSPROP_PERSISTENT_DIR  override persistent directory (default: %s)\n",
-               prog, prog, prog, SYSPROP_RUNTIME_DIR, SYSPROP_PERSISTENT_DIR);
+               "  %s delete key         -- delete a property\n",
+               prog, prog, prog);
 }
 
 }  // namespace
@@ -67,14 +45,11 @@ void PrintUsage(const char* prog) {
 
 int main(int argc, char* argv[]) {
   const char* prog = ProgName(argv[0]);
-  const ToolConfig cfg = ConfigFromEnv();
 
-  // Construct backends directly rather than using the global singleton so that
-  // environment-variable overrides take effect per invocation.
-  FileBackend runtime_backend(cfg.runtime_dir);
+  FileBackend runtime_backend(SYSPROP_RUNTIME_DIR);
   std::unique_ptr<FileBackend> persistent_backend;
-  if (cfg.enable_persistence) {
-    persistent_backend = std::make_unique<FileBackend>(cfg.persistent_dir);
+  if (SYSPROP_ENABLE_PERSISTENCE) {
+    persistent_backend = std::make_unique<FileBackend>(SYSPROP_PERSISTENT_DIR);
   }
   FilePropertyStore store(&runtime_backend, persistent_backend.get());
 
