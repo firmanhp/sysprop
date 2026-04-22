@@ -4,9 +4,8 @@
 #include <unistd.h>
 
 #include <cerrno>
-#include <cstdio>
-#include <cstdlib>
 #include <cstring>
+#include <iostream>
 #include <string>
 #include <string_view>
 
@@ -21,8 +20,7 @@ bool MkdirP(const char* path) {
       const char saved = p[i];
       p[i] = '\0';
       if (::mkdir(p.c_str(), 0755) < 0 && errno != EEXIST) {
-        std::fprintf(stderr, "sysprop-init: mkdir('%s'): %s\n", p.c_str(),
-                     std::strerror(errno));  // NOLINT(cppcoreguidelines-pro-type-vararg)
+        std::cerr << "sysprop-init: mkdir('" << p << "'): " << std::strerror(errno) << '\n';
         p[i] = saved;
         return false;
       }
@@ -40,19 +38,13 @@ void CleanupTmpFiles(const char* dir) {
 
   const struct dirent* entry = nullptr;
   while ((entry = ::readdir(d)) != nullptr) {
-    if (std::strncmp(entry->d_name, ".tmp.", 5) != 0) {
+    if (std::string_view{entry->d_name}.compare(0, 5, ".tmp.") != 0) {
       continue;
-    }  // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+    }
 
-    char path[4096];
-    std::snprintf(
-        path, sizeof(path), "%s/%s", dir,
-        entry
-            ->d_name);  // NOLINT(cppcoreguidelines-pro-type-vararg,cppcoreguidelines-pro-bounds-array-to-pointer-decay)
-    if (::unlink(path) == 0) {  // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
-      std::fprintf(
-          stderr, "sysprop-init: removed stale temp file: %s\n",
-          path);  // NOLINT(cppcoreguidelines-pro-type-vararg,cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+    const std::string path = std::string(dir) + "/" + entry->d_name;
+    if (::unlink(path.c_str()) == 0) {
+      std::cerr << "sysprop-init: removed stale temp file: " << path << '\n';
     }
   }
   ::closedir(d);
@@ -68,19 +60,17 @@ InitArgs ParseInitArgs(int argc, char* argv[]) {
   }  // NOLINT(concurrency-mt-unsafe)
 
   for (int i = 1; i < argc; ++i) {
-    const std::string_view arg{argv[i]};  // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+    const std::string_view arg{argv[i]};
     if (arg == "--runtime-dir" && i + 1 < argc) {
-      args.runtime_dir = argv[++i];  // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+      args.runtime_dir = argv[++i];
     } else if (arg == "--persistent-dir" && i + 1 < argc) {
-      args.persistent_dir = argv[++i];  // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+      args.persistent_dir = argv[++i];
     } else if (arg == "--no-persistence") {
       args.enable_persistence = false;
     } else if (arg.substr(0, 2) != "--") {
-      args.defaults_file = argv[i];  // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+      args.defaults_file = argv[i];
     } else {
-      std::fprintf(
-          stderr, "sysprop-init: unknown option: %s\n",
-          argv[i]);  // NOLINT(cppcoreguidelines-pro-type-vararg,cppcoreguidelines-pro-bounds-pointer-arithmetic)
+      std::cerr << "sysprop-init: unknown option: " << argv[i] << '\n';
     }
   }
   return args;

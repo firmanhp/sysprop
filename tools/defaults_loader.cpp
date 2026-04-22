@@ -1,8 +1,9 @@
 #include "defaults_loader.h"
 
 #include <cerrno>
-#include <cstdio>
 #include <cstring>
+#include <fstream>
+#include <iostream>
 #include <string>
 #include <string_view>
 
@@ -13,66 +14,55 @@
 namespace sysprop::tools {
 
 int LoadDefaultsFile(const char* path, sysprop::internal::PropertyStore& store) {
-  FILE* f = std::fopen(path, "r");
-  if (f == nullptr) {
-    std::fprintf(stderr, "sysprop-init: cannot open defaults file '%s': %s\n",
-                 path,  // NOLINT(cppcoreguidelines-pro-type-vararg)
-                 std::strerror(errno));
+  std::ifstream f{path};
+  if (!f.is_open()) {
+    std::cerr << "sysprop-init: cannot open defaults file '" << path << "': "
+              << std::strerror(errno) << '\n';
     return -1;
   }
 
-  // Enough space for the longest possible "key=value\r\n\0".
-  // MAX_KEY_LENGTH and MAX_VALUE_LENGTH include the null terminator, so the
-  // actual max string lengths are each (MAX - 1).  Total: (MAX_KEY-1) + 1 +
-  // (MAX_VAL-1) + 2 + 1 = MAX_KEY + MAX_VAL + 2.
-  char line[SYSPROP_MAX_KEY_LENGTH + SYSPROP_MAX_VALUE_LENGTH + 2];
   int loaded = 0;
   int lineno = 0;
+  std::string line;
 
-  while (std::fgets(line, sizeof(line), f) !=
-         nullptr) {  // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+  while (std::getline(f, line)) {
     ++lineno;
 
-    // Strip trailing CR/LF.
-    std::size_t len =
-        std::strlen(line);  // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
-    while (len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r')) {
-      line[--len] = '\0';
+    // Strip trailing CR (getline already strips \n).
+    if (!line.empty() && line.back() == '\r') {
+      line.pop_back();
     }
 
     // Skip leading whitespace, blank lines, and comments.
-    const char* p = line;  // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
-    while (*p == ' ' || *p == '\t') {
-      ++p;
+    std::size_t start = 0;
+    while (start < line.size() && (line[start] == ' ' || line[start] == '\t')) {
+      ++start;
     }
-    if (*p == '\0' || *p == '#') {
+    if (start == line.size() || line[start] == '#') {
       continue;
     }
 
     // Split on the first '='.
-    const char* eq = std::strchr(p, '=');
-    if (eq == nullptr) {
-      std::fprintf(stderr, "sysprop-init: %s:%d: malformed line (missing '='): %s\n", path,
-                   lineno,  // NOLINT(cppcoreguidelines-pro-type-vararg)
-                   line);   // NOLINT(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+    const std::size_t eq_pos = line.find('=', start);
+    if (eq_pos == std::string::npos) {
+      std::cerr << "sysprop-init: " << path << ':' << lineno
+                << ": malformed line (missing '='): " << std::string_view{line}.substr(start)
+                << '\n';
       continue;
     }
 
     // The value is everything after the first '=' (may itself contain '=').
-    const std::string_view key_sv{p, static_cast<std::size_t>(eq - p)};
-    const std::string key{key_sv};
-    const char* value = eq + 1;
+    const std::string key{line, start, eq_pos - start};
+    const std::string value{line, eq_pos + 1};
 
-    if (const int rc = store.Set(key.c_str(), value); rc == SYSPROP_OK) {
+    if (const int rc = store.Set(key.c_str(), value.c_str()); rc == SYSPROP_OK) {
       ++loaded;
     } else {
-      std::fprintf(stderr, "sysprop-init: %s:%d: failed to set '%s': %s\n", path,
-                   lineno,  // NOLINT(cppcoreguidelines-pro-type-vararg)
-                   key.c_str(), sysprop_error_string(rc));
+      std::cerr << "sysprop-init: " << path << ':' << lineno << ": failed to set '" << key
+                << "': " << sysprop_error_string(rc) << '\n';
     }
   }
 
-  std::fclose(f);
   return loaded;
 }
 

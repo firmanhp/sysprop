@@ -19,10 +19,10 @@ namespace {
 //   base_path (up to PATH_MAX) + '/' + key (SYSPROP_MAX_KEY_LENGTH) + nul
 // An extra 64 bytes covers the ".tmp.<key>.<pid>" suffix used during writes.
 constexpr std::size_t kPathBufSize = 4096 + SYSPROP_MAX_KEY_LENGTH + 64;
+constexpr int kFileMode = 0644;
 
 // RAII wrapper for a POSIX file descriptor.
-struct UniqueFd {  // NOLINT(cppcoreguidelines-special-member-functions,hicpp-special-member-functions)
-                   // -- copy intentionally deleted; move not needed, fd is used in-scope only
+struct UniqueFd {
   explicit UniqueFd(int fd) noexcept : fd_{fd} {}
   ~UniqueFd() {
     if (fd_ >= 0) {
@@ -31,6 +31,8 @@ struct UniqueFd {  // NOLINT(cppcoreguidelines-special-member-functions,hicpp-sp
   }
   UniqueFd(const UniqueFd&) = delete;
   UniqueFd& operator=(const UniqueFd&) = delete;
+  UniqueFd(UniqueFd&&) = delete;
+  UniqueFd& operator=(UniqueFd&&) = delete;
   [[nodiscard]] bool valid() const noexcept { return fd_ >= 0; }
   [[nodiscard]] int get() const noexcept { return fd_; }
 
@@ -41,10 +43,7 @@ struct UniqueFd {  // NOLINT(cppcoreguidelines-special-member-functions,hicpp-sp
 UniqueFd OpenReadOnly(const char* path) { return UniqueFd{::open(path, O_RDONLY | O_CLOEXEC)}; }
 
 UniqueFd OpenWriteNew(const char* path) {
-  return UniqueFd{
-      ::open(path, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC,
-             0644)};  // NOLINT(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers) --
-                      // 0644 is a standard POSIX octal permission constant, universally understood
+  return UniqueFd{::open(path, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, kFileMode)};
 }
 
 // RAII wrapper for a DIR*.

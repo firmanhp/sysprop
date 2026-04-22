@@ -1,6 +1,7 @@
 #include <unistd.h>
 
 #include <cstdio>
+#include <cstring>
 #include <memory>
 #include <string>
 
@@ -98,13 +99,14 @@ BENCHMARK(BM_List)->Arg(10)->Arg(100)->Arg(1000);
 void BM_ConcurrentReads(benchmark::State& state) {
   // Shared state for the multi-threaded benchmark. Only thread 0 sets up and
   // tears down; all threads execute the inner loop in parallel.
-  static std::string shared_dir;  // NOLINT(runtime/string)
+  static char shared_dir[4096];
   static std::unique_ptr<FileBackend> shared_backend;
   static std::unique_ptr<PropertyStore> shared_store;
 
   if (state.thread_index() == 0) {
-    shared_dir = MakeTmpDir();
-    shared_backend = std::make_unique<FileBackend>(shared_dir.c_str());
+    std::strncpy(shared_dir, MakeTmpDir().c_str(), sizeof(shared_dir) - 1);
+    shared_dir[sizeof(shared_dir) - 1] = '\0';
+    shared_backend = std::make_unique<FileBackend>(shared_dir);
     shared_store = std::make_unique<PropertyStore>(shared_backend.get(), nullptr);
     (void)shared_store->Set("shared.read.key", "shared_value");
   }

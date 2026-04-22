@@ -24,14 +24,16 @@ namespace sysprop::internal {
 //   All public methods are safe to call concurrently. Multiple simultaneous
 //   reads are always safe. Concurrent writes to different keys are safe.
 //   Concurrent writes to the same key are safe (last rename wins).
-class FileBackend
-    final {  // NOLINT(cppcoreguidelines-special-member-functions,hicpp-special-member-functions) --
-             // default dtor only; FileBackend holds no heap resources so no move/copy needed
+class FileBackend final {
  public:
   // base_path must point to an existing directory. The string is copied
   // internally; the caller's buffer need not outlive this constructor call.
   explicit FileBackend(const char* base_path);
   ~FileBackend() = default;
+  FileBackend(const FileBackend&) = delete;
+  FileBackend& operator=(const FileBackend&) = delete;
+  FileBackend(FileBackend&&) = default;
+  FileBackend& operator=(FileBackend&&) = default;
 
   [[nodiscard]] int Get(const char* key, char* buf, std::size_t buf_len);
   [[nodiscard]] int Set(const char* key, const char* value);

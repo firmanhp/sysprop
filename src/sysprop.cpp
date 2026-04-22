@@ -52,15 +52,10 @@ struct GlobalStore {
 // Raw storage avoids any static-initializer or atexit registration.
 // Placement-new'd by sysprop_auto_init(); never explicitly destructed (lifetime
 // matches the process — the OS reclaims on exit).
-alignas(GlobalStore) static unsigned char s_storage[sizeof(
-    GlobalStore)];  // NOLINT(cppcoreguidelines-avoid-non-const-global-variables,readability-static-definition-in-anonymous-namespace)
-                    // -- placement-new singleton buffer; intentionally non-const and file-scoped
-static GlobalStore* s_instance = nullptr;  // NOLINT(cppcoreguidelines-avoid-non-const-global-variables,readability-static-definition-in-anonymous-namespace)
-                                           // -- singleton pointer; null until sysprop_auto_init()
-
-// Test-injection override. When non-null, GetStore() returns this instead of
-// the singleton's FilePropertyStore. Set/cleared by swap_store().
-static PropertyStore* s_store_override = nullptr;  // NOLINT(cppcoreguidelines-avoid-non-const-global-variables,readability-static-definition-in-anonymous-namespace)
+alignas(GlobalStore) unsigned char s_storage[sizeof(  // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
+    GlobalStore)];
+GlobalStore* s_instance = nullptr;             // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
+PropertyStore* s_store_override = nullptr;     // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
 PropertyStore* GetStore() {
   if (s_store_override != nullptr) { return s_store_override; }

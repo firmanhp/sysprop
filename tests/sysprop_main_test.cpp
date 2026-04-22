@@ -7,10 +7,10 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#include <array>
 #include <cstdio>
 #include <cstring>
 #include <string>
+#include <vector>
 
 #include <gtest/gtest.h>
 #include <sysprop/sysprop.h>
@@ -94,17 +94,20 @@ class CliTest : public ::testing::Test {
 
 // ── Argv helpers ─────────────────────────────────────────────────────────────
 
-// Build a mutable argv array from a list of string literals so it can be
-// passed to the CLI functions (which take char*[], not const char*[]).
-template <std::size_t N>
-std::array<char*, N> MakeArgv(const char* (&src)[N]) {
-  std::array<char*, N> out;
-  for (std::size_t i = 0; i < N; ++i) {
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
-    out[i] = const_cast<char*>(src[i]);
+// Owns mutable copies of string literals so they can be passed to CLI
+// functions that take char*[] (matching POSIX main() convention).
+struct MutableArgv {
+  MutableArgv(std::initializer_list<const char*> args) {
+    strings_.assign(args.begin(), args.end());
+    for (auto& s : strings_) ptrs_.push_back(s.data());
   }
-  return out;
-}
+  int argc() const { return static_cast<int>(ptrs_.size()); }
+  char** data() { return ptrs_.data(); }
+
+ private:
+  std::vector<std::string> strings_;
+  std::vector<char*> ptrs_;
+};
 
 }  // namespace
 
@@ -159,10 +162,9 @@ TEST_F(CliTest, DoListOutputFormatIsKeyColon) {
 // getprop with no key → list all
 TEST_F(CliTest, CmdGetpropNoArgListsAll) {
   Set("list.key", "listed");
-  const char* argv[] = {"getprop"};
-  auto av = MakeArgv(argv);
+  MutableArgv av{"getprop"};
   BeginCapture();
-  const int rc = sysprop::tools::CmdGetprop(1, av.data(), *store_);
+  const int rc = sysprop::tools::CmdGetprop(av.argc(), av.data(), *store_);
   const std::string out = EndCapture();
   EXPECT_EQ(rc, 0);
   EXPECT_NE(out.find("[list.key]: [listed]"), std::string::npos);
@@ -171,10 +173,9 @@ TEST_F(CliTest, CmdGetpropNoArgListsAll) {
 // getprop key → found, prints value
 TEST_F(CliTest, CmdGetpropFoundPrintsValue) {
   Set("net.hostname", "mybox");
-  const char* argv[] = {"getprop", "net.hostname"};
-  auto av = MakeArgv(argv);
+  MutableArgv av{"getprop", "net.hostname"};
   BeginCapture();
-  const int rc = sysprop::tools::CmdGetprop(2, av.data(), *store_);
+  const int rc = sysprop::tools::CmdGetprop(av.argc(), av.data(), *store_);
   const std::string out = EndCapture();
   EXPECT_EQ(rc, 0);
   EXPECT_EQ(out, "mybox\n");
@@ -182,10 +183,9 @@ TEST_F(CliTest, CmdGetpropFoundPrintsValue) {
 
 // getprop key → not found, no default → prints empty line, returns 0
 TEST_F(CliTest, CmdGetpropNotFoundNoDefaultPrintsEmptyLine) {
-  const char* argv[] = {"getprop", "no.such.key"};
-  auto av = MakeArgv(argv);
+  MutableArgv av{"getprop", "no.such.key"};
   BeginCapture();
-  const int rc = sysprop::tools::CmdGetprop(2, av.data(), *store_);
+  const int rc = sysprop::tools::CmdGetprop(av.argc(), av.data(), *store_);
   const std::string out = EndCapture();
   EXPECT_EQ(rc, 0);
   EXPECT_EQ(out, "\n");
@@ -193,10 +193,9 @@ TEST_F(CliTest, CmdGetpropNotFoundNoDefaultPrintsEmptyLine) {
 
 // getprop key default → not found, prints default, returns 0
 TEST_F(CliTest, CmdGetpropNotFoundWithDefaultPrintsDefault) {
-  const char* argv[] = {"getprop", "no.such.key", "fallback"};
-  auto av = MakeArgv(argv);
+  MutableArgv av{"getprop", "no.such.key", "fallback"};
   BeginCapture();
-  const int rc = sysprop::tools::CmdGetprop(3, av.data(), *store_);
+  const int rc = sysprop::tools::CmdGetprop(av.argc(), av.data(), *store_);
   const std::string out = EndCapture();
   EXPECT_EQ(rc, 0);
   EXPECT_EQ(out, "fallback\n");
@@ -205,10 +204,9 @@ TEST_F(CliTest, CmdGetpropNotFoundWithDefaultPrintsDefault) {
 // getprop key default → found, prints actual value (not default)
 TEST_F(CliTest, CmdGetpropFoundIgnoresDefault) {
   Set("hw.id", "realval");
-  const char* argv[] = {"getprop", "hw.id", "fallback"};
-  auto av = MakeArgv(argv);
+  MutableArgv av{"getprop", "hw.id", "fallback"};
   BeginCapture();
-  const int rc = sysprop::tools::CmdGetprop(3, av.data(), *store_);
+  const int rc = sysprop::tools::CmdGetprop(av.argc(), av.data(), *store_);
   const std::string out = EndCapture();
   EXPECT_EQ(rc, 0);
   EXPECT_EQ(out, "realval\n");
@@ -218,23 +216,20 @@ TEST_F(CliTest, CmdGetpropFoundIgnoresDefault) {
 
 // setprop with too few args → usage error, returns 1
 TEST_F(CliTest, CmdSetpropTooFewArgsReturnsOne) {
-  const char* argv[] = {"setprop", "only.key"};
-  auto av = MakeArgv(argv);
-  EXPECT_EQ(sysprop::tools::CmdSetprop(2, av.data(), *store_), 1);
+  MutableArgv av{"setprop", "only.key"};
+  EXPECT_EQ(sysprop::tools::CmdSetprop(av.argc(), av.data(), *store_), 1);
 }
 
 // setprop no args at all → usage error, returns 1
 TEST_F(CliTest, CmdSetpropNoArgsReturnsOne) {
-  const char* argv[] = {"setprop"};
-  auto av = MakeArgv(argv);
-  EXPECT_EQ(sysprop::tools::CmdSetprop(1, av.data(), *store_), 1);
+  MutableArgv av{"setprop"};
+  EXPECT_EQ(sysprop::tools::CmdSetprop(av.argc(), av.data(), *store_), 1);
 }
 
 // setprop key value → succeeds, value readable afterwards
 TEST_F(CliTest, CmdSetpropSuccessStoresValue) {
-  const char* argv[] = {"setprop", "debug.level", "verbose"};
-  auto av = MakeArgv(argv);
-  EXPECT_EQ(sysprop::tools::CmdSetprop(3, av.data(), *store_), 0);
+  MutableArgv av{"setprop", "debug.level", "verbose"};
+  EXPECT_EQ(sysprop::tools::CmdSetprop(av.argc(), av.data(), *store_), 0);
 
   char buf[SYSPROP_MAX_VALUE_LENGTH];
   EXPECT_GT(store_->Get("debug.level", buf, sizeof(buf)), 0);
@@ -243,37 +238,32 @@ TEST_F(CliTest, CmdSetpropSuccessStoresValue) {
 
 // setprop ro.* twice → second returns 1 (read-only)
 TEST_F(CliTest, CmdSetpropRoSecondWriteReturnsOne) {
-  const char* set1[] = {"setprop", "ro.hw.sku", "A"};
-  auto av1 = MakeArgv(set1);
-  EXPECT_EQ(sysprop::tools::CmdSetprop(3, av1.data(), *store_), 0);
+  MutableArgv av1{"setprop", "ro.hw.sku", "A"};
+  EXPECT_EQ(sysprop::tools::CmdSetprop(av1.argc(), av1.data(), *store_), 0);
 
-  const char* set2[] = {"setprop", "ro.hw.sku", "B"};
-  auto av2 = MakeArgv(set2);
-  EXPECT_EQ(sysprop::tools::CmdSetprop(3, av2.data(), *store_), 1);
+  MutableArgv av2{"setprop", "ro.hw.sku", "B"};
+  EXPECT_EQ(sysprop::tools::CmdSetprop(av2.argc(), av2.data(), *store_), 1);
 }
 
 // setprop invalid key → returns 1
 TEST_F(CliTest, CmdSetpropInvalidKeyReturnsOne) {
-  const char* argv[] = {"setprop", "bad key!", "val"};
-  auto av = MakeArgv(argv);
-  EXPECT_EQ(sysprop::tools::CmdSetprop(3, av.data(), *store_), 1);
+  MutableArgv av{"setprop", "bad key!", "val"};
+  EXPECT_EQ(sysprop::tools::CmdSetprop(av.argc(), av.data(), *store_), 1);
 }
 
 // ── CmdDelete ─────────────────────────────────────────────────────────────────
 
 // delete with no key → usage error, returns 1
 TEST_F(CliTest, CmdDeleteNoKeyReturnsOne) {
-  const char* argv[] = {"sysprop"};
-  auto av = MakeArgv(argv);
-  EXPECT_EQ(sysprop::tools::CmdDelete(1, av.data(), *store_), 1);
+  MutableArgv av{"sysprop"};
+  EXPECT_EQ(sysprop::tools::CmdDelete(av.argc(), av.data(), *store_), 1);
 }
 
 // delete existing key → succeeds, key gone
 TEST_F(CliTest, CmdDeleteExistingKeySucceeds) {
   Set("tmp.data", "42");
-  const char* argv[] = {"sysprop", "tmp.data"};
-  auto av = MakeArgv(argv);
-  EXPECT_EQ(sysprop::tools::CmdDelete(2, av.data(), *store_), 0);
+  MutableArgv av{"sysprop", "tmp.data"};
+  EXPECT_EQ(sysprop::tools::CmdDelete(av.argc(), av.data(), *store_), 0);
 
   char buf[SYSPROP_MAX_VALUE_LENGTH];
   EXPECT_EQ(store_->Get("tmp.data", buf, sizeof(buf)), SYSPROP_ERR_NOT_FOUND);
@@ -281,17 +271,15 @@ TEST_F(CliTest, CmdDeleteExistingKeySucceeds) {
 
 // delete nonexistent key → returns non-zero
 TEST_F(CliTest, CmdDeleteNonexistentKeyReturnsNonzero) {
-  const char* argv[] = {"sysprop", "no.such.key"};
-  auto av = MakeArgv(argv);
-  EXPECT_NE(sysprop::tools::CmdDelete(2, av.data(), *store_), 0);
+  MutableArgv av{"sysprop", "no.such.key"};
+  EXPECT_NE(sysprop::tools::CmdDelete(av.argc(), av.data(), *store_), 0);
 }
 
 // delete ro.* key → denied, returns 1
 TEST_F(CliTest, CmdDeleteRoKeyReturnsOne) {
   Set("ro.product.model", "EVB-1");
-  const char* argv[] = {"sysprop", "ro.product.model"};
-  auto av = MakeArgv(argv);
-  EXPECT_EQ(sysprop::tools::CmdDelete(2, av.data(), *store_), 1);
+  MutableArgv av{"sysprop", "ro.product.model"};
+  EXPECT_EQ(sysprop::tools::CmdDelete(av.argc(), av.data(), *store_), 1);
 
   // Verify key is still present
   char buf[SYSPROP_MAX_VALUE_LENGTH];

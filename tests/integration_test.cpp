@@ -251,10 +251,8 @@ TEST_F(IntegrationTest, RoPrefixTakesPrecedenceOverPersistPrefix) {
   // ro.persist.* is read-only and must NOT be written to the persistent backend.
   ASSERT_EQ(SYSPROP_OK, store_->Set("ro.persist.cfg", "locked"));
   EXPECT_EQ(SYSPROP_ERR_READ_ONLY, store_->Set("ro.persist.cfg", "hacked"));
-  char ps_path[512];
-  std::snprintf(ps_path, sizeof(ps_path), "%s/ro.persist.cfg",
-                ps_dir_.c_str());  // NOLINT(cppcoreguidelines-pro-type-vararg)
-  EXPECT_NE(0, ::access(ps_path, F_OK));
+  const std::string ps_path = ps_dir_ + "/ro.persist.cfg";
+  EXPECT_NE(0, ::access(ps_path.c_str(), F_OK));
 }
 
 TEST_F(IntegrationTest, TwoStoresOnSameRuntimeDirRoFirstWins) {

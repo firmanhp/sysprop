@@ -3,7 +3,6 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#include <array>
 #include <cerrno>
 #include <cstring>
 #include <string>
@@ -197,16 +196,20 @@ TEST_F(CleanupTmpFilesTest, MultipleOldCrashFilesAllRemoved) {
 
 namespace {
 
-// Build a mutable argv array from string-literal pointers.
-template <std::size_t N>
-std::array<char*, N> MakeArgv(const char* (&src)[N]) {
-  std::array<char*, N> out;
-  for (std::size_t i = 0; i < N; ++i) {
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
-    out[i] = const_cast<char*>(src[i]);
+// Owns mutable copies of string literals so they can be passed to functions
+// that take char*[] (matching POSIX main() convention).
+struct MutableArgv {
+  MutableArgv(std::initializer_list<const char*> args) {
+    strings_.assign(args.begin(), args.end());
+    for (auto& s : strings_) ptrs_.push_back(s.data());
   }
-  return out;
-}
+  int argc() const { return static_cast<int>(ptrs_.size()); }
+  char** data() { return ptrs_.data(); }
+
+ private:
+  std::vector<std::string> strings_;
+  std::vector<char*> ptrs_;
+};
 
 }  // namespace
 
@@ -215,9 +218,8 @@ TEST(ParseInitArgsTest, DefaultsWhenNoArgsAndNoEnv) {
   // Ensure env vars are not set for this test.
   ::unsetenv("SYSPROP_RUNTIME_DIR");
   ::unsetenv("SYSPROP_PERSISTENT_DIR");
-  const char* argv[] = {"sysprop-init"};
-  auto av = MakeArgv(argv);
-  const auto args = sysprop::tools::ParseInitArgs(1, av.data());
+  MutableArgv av{"sysprop-init"};
+  const auto args = sysprop::tools::ParseInitArgs(av.argc(), av.data());
   EXPECT_STREQ(args.runtime_dir, SYSPROP_RUNTIME_DIR);
   EXPECT_STREQ(args.persistent_dir, SYSPROP_PERSISTENT_DIR);
   EXPECT_EQ(args.defaults_file, nullptr);
@@ -227,34 +229,30 @@ TEST(ParseInitArgsTest, DefaultsWhenNoArgsAndNoEnv) {
 // --runtime-dir overrides the runtime directory.
 TEST(ParseInitArgsTest, RuntimeDirFlag) {
   ::unsetenv("SYSPROP_RUNTIME_DIR");
-  const char* argv[] = {"sysprop-init", "--runtime-dir", "/tmp/my-rt"};
-  auto av = MakeArgv(argv);
-  const auto args = sysprop::tools::ParseInitArgs(3, av.data());
+  MutableArgv av{"sysprop-init", "--runtime-dir", "/tmp/my-rt"};
+  const auto args = sysprop::tools::ParseInitArgs(av.argc(), av.data());
   EXPECT_STREQ(args.runtime_dir, "/tmp/my-rt");
 }
 
 // --persistent-dir overrides the persistent directory.
 TEST(ParseInitArgsTest, PersistentDirFlag) {
   ::unsetenv("SYSPROP_PERSISTENT_DIR");
-  const char* argv[] = {"sysprop-init", "--persistent-dir", "/tmp/my-ps"};
-  auto av = MakeArgv(argv);
-  const auto args = sysprop::tools::ParseInitArgs(3, av.data());
+  MutableArgv av{"sysprop-init", "--persistent-dir", "/tmp/my-ps"};
+  const auto args = sysprop::tools::ParseInitArgs(av.argc(), av.data());
   EXPECT_STREQ(args.persistent_dir, "/tmp/my-ps");
 }
 
 // --no-persistence sets enable_persistence to false.
 TEST(ParseInitArgsTest, NoPersistenceFlag) {
-  const char* argv[] = {"sysprop-init", "--no-persistence"};
-  auto av = MakeArgv(argv);
-  const auto args = sysprop::tools::ParseInitArgs(2, av.data());
+  MutableArgv av{"sysprop-init", "--no-persistence"};
+  const auto args = sysprop::tools::ParseInitArgs(av.argc(), av.data());
   EXPECT_FALSE(args.enable_persistence);
 }
 
 // Positional (non-flag) argument is treated as defaults_file.
 TEST(ParseInitArgsTest, PositionalArgIsDefaultsFile) {
-  const char* argv[] = {"sysprop-init", "/etc/build.prop"};
-  auto av = MakeArgv(argv);
-  const auto args = sysprop::tools::ParseInitArgs(2, av.data());
+  MutableArgv av{"sysprop-init", "/etc/build.prop"};
+  const auto args = sysprop::tools::ParseInitArgs(av.argc(), av.data());
   EXPECT_STREQ(args.defaults_file, "/etc/build.prop");
 }
 
@@ -262,10 +260,9 @@ TEST(ParseInitArgsTest, PositionalArgIsDefaultsFile) {
 TEST(ParseInitArgsTest, AllFlagsCombined) {
   ::unsetenv("SYSPROP_RUNTIME_DIR");
   ::unsetenv("SYSPROP_PERSISTENT_DIR");
-  const char* argv[] = {"sysprop-init", "--runtime-dir",    "/run/rt",        "--persistent-dir",
-                        "/etc/ps",      "--no-persistence", "/etc/build.prop"};
-  auto av = MakeArgv(argv);
-  const auto args = sysprop::tools::ParseInitArgs(7, av.data());
+  MutableArgv av{"sysprop-init", "--runtime-dir", "/run/rt", "--persistent-dir",
+                 "/etc/ps",     "--no-persistence", "/etc/build.prop"};
+  const auto args = sysprop::tools::ParseInitArgs(av.argc(), av.data());
   EXPECT_STREQ(args.runtime_dir, "/run/rt");
   EXPECT_STREQ(args.persistent_dir, "/etc/ps");
   EXPECT_STREQ(args.defaults_file, "/etc/build.prop");
@@ -276,9 +273,8 @@ TEST(ParseInitArgsTest, AllFlagsCombined) {
 TEST(ParseInitArgsTest, EnvVarOverridesRuntimeDir) {
   ::setenv("SYSPROP_RUNTIME_DIR", "/env/rt", 1);
   ::unsetenv("SYSPROP_PERSISTENT_DIR");
-  const char* argv[] = {"sysprop-init"};
-  auto av = MakeArgv(argv);
-  const auto args = sysprop::tools::ParseInitArgs(1, av.data());
+  MutableArgv av{"sysprop-init"};
+  const auto args = sysprop::tools::ParseInitArgs(av.argc(), av.data());
   EXPECT_STREQ(args.runtime_dir, "/env/rt");
   ::unsetenv("SYSPROP_RUNTIME_DIR");
 }
@@ -287,9 +283,8 @@ TEST(ParseInitArgsTest, EnvVarOverridesRuntimeDir) {
 TEST(ParseInitArgsTest, EnvVarOverridesPersistentDir) {
   ::unsetenv("SYSPROP_RUNTIME_DIR");
   ::setenv("SYSPROP_PERSISTENT_DIR", "/env/ps", 1);
-  const char* argv[] = {"sysprop-init"};
-  auto av = MakeArgv(argv);
-  const auto args = sysprop::tools::ParseInitArgs(1, av.data());
+  MutableArgv av{"sysprop-init"};
+  const auto args = sysprop::tools::ParseInitArgs(av.argc(), av.data());
   EXPECT_STREQ(args.persistent_dir, "/env/ps");
   ::unsetenv("SYSPROP_PERSISTENT_DIR");
 }
@@ -298,10 +293,8 @@ TEST(ParseInitArgsTest, EnvVarOverridesPersistentDir) {
 TEST(ParseInitArgsTest, FlagOverridesEnvVar) {
   ::setenv("SYSPROP_RUNTIME_DIR", "/env/rt", 1);
   ::setenv("SYSPROP_PERSISTENT_DIR", "/env/ps", 1);
-  const char* argv[] = {"sysprop-init", "--runtime-dir", "/flag/rt", "--persistent-dir",
-                        "/flag/ps"};
-  auto av = MakeArgv(argv);
-  const auto args = sysprop::tools::ParseInitArgs(5, av.data());
+  MutableArgv av{"sysprop-init", "--runtime-dir", "/flag/rt", "--persistent-dir", "/flag/ps"};
+  const auto args = sysprop::tools::ParseInitArgs(av.argc(), av.data());
   EXPECT_STREQ(args.runtime_dir, "/flag/rt");
   EXPECT_STREQ(args.persistent_dir, "/flag/ps");
   ::unsetenv("SYSPROP_RUNTIME_DIR");
@@ -312,17 +305,15 @@ TEST(ParseInitArgsTest, FlagOverridesEnvVar) {
 // but no next token → the flag is skipped because i+1 >= argc).
 TEST(ParseInitArgsTest, RuntimeDirFlagWithoutValueIsIgnored) {
   ::unsetenv("SYSPROP_RUNTIME_DIR");
-  const char* argv[] = {"sysprop-init", "--runtime-dir"};
-  auto av = MakeArgv(argv);
+  MutableArgv av{"sysprop-init", "--runtime-dir"};
   // Should not crash; runtime_dir falls back to compiled-in default or env.
-  const auto args = sysprop::tools::ParseInitArgs(2, av.data());
+  const auto args = sysprop::tools::ParseInitArgs(av.argc(), av.data());
   EXPECT_STREQ(args.runtime_dir, SYSPROP_RUNTIME_DIR);
 }
 
 // Unknown --flag is silently logged but does not abort.
 TEST(ParseInitArgsTest, UnknownFlagIgnored) {
-  const char* argv[] = {"sysprop-init", "--unknown-flag"};
-  auto av = MakeArgv(argv);
+  MutableArgv av{"sysprop-init", "--unknown-flag"};
   // Should not crash.
-  EXPECT_NO_FATAL_FAILURE((void)sysprop::tools::ParseInitArgs(2, av.data()));
+  EXPECT_NO_FATAL_FAILURE((void)sysprop::tools::ParseInitArgs(av.argc(), av.data()));
 }
