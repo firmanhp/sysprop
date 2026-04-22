@@ -42,8 +42,27 @@ int CmdSetprop(int argc, char* argv[], sysprop::internal::PropertyStore& store) 
     std::cerr << "Usage: setprop <key> <value>\n";
     return 1;
   }
-  if (const int rc = store.Set(argv[1], argv[2]); rc != SYSPROP_OK) {
-    std::cerr << "setprop: failed to set '" << argv[1] << "': " << sysprop_error_string(rc) << '\n';
+
+  const char* key = argv[1];
+  std::string value{argv[2]};
+
+  // Strip surrounding double-quotes (e.g. setprop key "value" passes literal quotes in some shells).
+  if (value.size() >= 2 && value.front() == '"' && value.back() == '"') {
+    value = value.substr(1, value.size() - 2);
+  }
+
+  // Empty value means delete.
+  if (value.empty()) {
+    const int rc = store.Delete(key);
+    if (rc != SYSPROP_OK && rc != SYSPROP_ERR_NOT_FOUND) {
+      std::cerr << "setprop: failed to delete '" << key << "': " << sysprop_error_string(rc) << '\n';
+      return 1;
+    }
+    return 0;
+  }
+
+  if (const int rc = store.Set(key, value.c_str()); rc != SYSPROP_OK) {
+    std::cerr << "setprop: failed to set '" << key << "': " << sysprop_error_string(rc) << '\n';
     return 1;
   }
   return 0;

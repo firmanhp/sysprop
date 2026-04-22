@@ -200,6 +200,54 @@ TEST_F(CliTest, CmdSetpropInvalidKeyReturnsOne) {
   EXPECT_EQ(sysprop::tools::CmdSetprop(av.argc(), av.data(), *store_), 1);
 }
 
+// setprop key "" → empty value deletes an existing property
+TEST_F(CliTest, CmdSetpropEmptyValueDeletesProperty) {
+  Set("tmp.item", "old");
+  MutableArgv av{"setprop", "tmp.item", ""};
+  EXPECT_EQ(sysprop::tools::CmdSetprop(av.argc(), av.data(), *store_), 0);
+
+  char buf[SYSPROP_MAX_VALUE_LENGTH];
+  EXPECT_EQ(store_->Get("tmp.item", buf, sizeof(buf)), SYSPROP_ERR_NOT_FOUND);
+}
+
+// setprop key "" → no-op when property doesn't exist (still returns 0)
+TEST_F(CliTest, CmdSetpropEmptyValueOnMissingKeySucceeds) {
+  MutableArgv av{"setprop", "no.such.key", ""};
+  EXPECT_EQ(sysprop::tools::CmdSetprop(av.argc(), av.data(), *store_), 0);
+}
+
+// setprop key `"hello"` → surrounding double-quotes are stripped; stores hello
+TEST_F(CliTest, CmdSetpropStripsOuterDoubleQuotes) {
+  MutableArgv av{"setprop", "net.host", "\"mybox\""};
+  EXPECT_EQ(sysprop::tools::CmdSetprop(av.argc(), av.data(), *store_), 0);
+
+  char buf[SYSPROP_MAX_VALUE_LENGTH];
+  EXPECT_GT(store_->Get("net.host", buf, sizeof(buf)), 0);
+  EXPECT_STREQ(buf, "mybox");
+}
+
+// setprop key `""` → quote-strip produces empty → deletes property
+TEST_F(CliTest, CmdSetpropEmptyQuotedValueDeletesProperty) {
+  Set("tmp.item", "old");
+  MutableArgv av{"setprop", "tmp.item", "\"\""};
+  EXPECT_EQ(sysprop::tools::CmdSetprop(av.argc(), av.data(), *store_), 0);
+
+  char buf[SYSPROP_MAX_VALUE_LENGTH];
+  EXPECT_EQ(store_->Get("tmp.item", buf, sizeof(buf)), SYSPROP_ERR_NOT_FOUND);
+}
+
+// setprop ro.* "" → denied (read-only), returns 1
+TEST_F(CliTest, CmdSetpropEmptyValueOnRoKeyReturnsOne) {
+  Set("ro.hw.rev", "1");
+  MutableArgv av{"setprop", "ro.hw.rev", ""};
+  EXPECT_EQ(sysprop::tools::CmdSetprop(av.argc(), av.data(), *store_), 1);
+
+  // Property must still be present.
+  char buf[SYSPROP_MAX_VALUE_LENGTH];
+  EXPECT_GT(store_->Get("ro.hw.rev", buf, sizeof(buf)), 0);
+  EXPECT_STREQ(buf, "1");
+}
+
 // ── CmdDelete ─────────────────────────────────────────────────────────────────
 
 // delete with no key → usage error, returns 1
