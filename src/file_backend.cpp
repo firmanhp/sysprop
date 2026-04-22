@@ -16,6 +16,7 @@ namespace {
 // Maximum size of a path buffer we construct:
 //   base_path (up to PATH_MAX) + '/' + key (SYSPROP_MAX_KEY_LENGTH) + nul
 // An extra 64 bytes covers the ".tmp.<key>.<pid>" suffix used during writes.
+// 4096 == FileBackend::kMaxBasePathSize — must stay in sync if that changes.
 constexpr std::size_t kPathBufSize = 4096 + SYSPROP_MAX_KEY_LENGTH + 64;
 constexpr int kFileMode = 0644;
 

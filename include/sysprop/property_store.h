@@ -12,10 +12,10 @@ namespace sysprop::internal {
 class PropertyStore {
  public:
   PropertyStore() = default;
-  PropertyStore(const PropertyStore&) = default;
-  PropertyStore& operator=(const PropertyStore&) = default;
-  PropertyStore(PropertyStore&&) = default;
-  PropertyStore& operator=(PropertyStore&&) = default;
+  PropertyStore(const PropertyStore&) = delete;
+  PropertyStore& operator=(const PropertyStore&) = delete;
+  PropertyStore(PropertyStore&&) = delete;
+  PropertyStore& operator=(PropertyStore&&) = delete;
   virtual ~PropertyStore() = default;
 
   [[nodiscard]] virtual int Get(const char* key, char* buf, std::size_t buf_len) = 0;

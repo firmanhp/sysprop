@@ -15,6 +15,7 @@ namespace {
 constexpr std::string_view kRoPrefix = "ro.";
 constexpr std::string_view kPersistPrefix = "persist.";
 
+// string_view::starts_with is C++20; this is the C++17 equivalent.
 [[nodiscard]] bool StartsWith(std::string_view str, std::string_view prefix) noexcept {
   return str.substr(0, prefix.size()) == prefix;
 }
