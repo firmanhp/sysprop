@@ -152,6 +152,16 @@ TEST_F(FilePropertyStoreTest, SetInitRoWriteOnceThenRejected) {
   EXPECT_STREQ("first", buf_);
 }
 
+TEST_F(FilePropertyStoreTest, SetInitRejectsInvalidKey) {
+  EXPECT_EQ(SYSPROP_ERR_INVALID_KEY, store_->SetInit("bad key!", "value"));
+  EXPECT_EQ(SYSPROP_ERR_INVALID_KEY, store_->SetInit("", "value"));
+}
+
+TEST_F(FilePropertyStoreTest, SetInitRejectsValueTooLong) {
+  const std::string too_long(SYSPROP_MAX_VALUE_LENGTH, 'x');
+  EXPECT_EQ(SYSPROP_ERR_VALUE_TOO_LONG, store_->SetInit("ro.valid", too_long.c_str()));
+}
+
 // ── Prefix-boundary corner cases ─────────────────────────────────────────────
 
 TEST_F(FilePropertyStoreTest, BareRoKeyWithoutDotIsNotReadOnly) {

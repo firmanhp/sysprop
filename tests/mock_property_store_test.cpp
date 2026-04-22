@@ -70,6 +70,18 @@ TEST(MockPropertyStoreTest, NoPolicyEnforcement) {
   EXPECT_STREQ("v2", buf);
 }
 
+TEST(MockPropertyStoreTest, SetInitNoPolicyEnforcement) {
+  // SetInit() on the mock has no write-once semantics — unlike FilePropertyStore,
+  // repeated SetInit() calls on the same ro.* key all succeed and the last value wins.
+  MockPropertyStore mock;
+  ASSERT_EQ(SYSPROP_OK, mock.SetInit("ro.hw.rev", "first"));
+  ASSERT_EQ(SYSPROP_OK, mock.SetInit("ro.hw.rev", "second"));  // no ERR_READ_ONLY
+  char buf[SYSPROP_MAX_VALUE_LENGTH];
+  const int n = mock.Get("ro.hw.rev", buf, sizeof(buf));
+  ASSERT_GE(n, 0);
+  EXPECT_STREQ("second", buf);
+}
+
 // ── RAII injection — sysprop_xxx() hits the mock ─────────────────────────────
 
 TEST(MockPropertyStoreTest, SyspropSetAndGetHitMock) {

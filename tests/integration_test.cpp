@@ -232,8 +232,10 @@ TEST_F(IntegrationTest, RoPrefixTakesPrecedenceOverPersistPrefix) {
 }
 
 TEST_F(IntegrationTest, TwoStoresOnSameRuntimeDirRoFirstWins) {
-  // Simulate two sysprop-init instances racing to set the same ro.* key.
-  // Whichever commits first locks it; the other must get READ_ONLY.
+  // Sequential simulation: first SetInit() succeeds; second sees Exists()==OK
+  // and returns SYSPROP_ERR_READ_ONLY. A true concurrent race is not covered
+  // here — the architectural assumption is that a single sysprop-init oneshot
+  // service runs before any other process starts.
   FileBackend shared_rt{rt_dir_.c_str()};
   FileBackend shared_ps{ps_dir_.c_str()};
   FilePropertyStore store2{&shared_rt, &shared_ps};

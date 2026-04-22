@@ -24,9 +24,13 @@ class PropertyStore {
   // Regular write. ro.* keys are always rejected with SYSPROP_ERR_READ_ONLY.
   [[nodiscard]] virtual int Set(const char* key, const char* value) = 0;
 
-  // Privileged write used only by sysprop-init. Allows ro.* keys (write-once:
-  // subsequent calls return SYSPROP_ERR_READ_ONLY). For non-ro.* keys,
+  // Privileged write used ONLY by sysprop-init (via LoadDefaultsFile).
+  // Allows ro.* keys to be written exactly once at boot; subsequent calls for
+  // the same ro.* key return SYSPROP_ERR_READ_ONLY. For non-ro.* keys,
   // behaviour is identical to Set().
+  //
+  // DO NOT call this from application code. The only permitted caller is
+  // LoadDefaultsFile() in tools/defaults_loader.cpp.
   [[nodiscard]] virtual int SetInit(const char* key, const char* value) = 0;
 
   [[nodiscard]] virtual int Delete(const char* key) = 0;
