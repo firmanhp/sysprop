@@ -12,14 +12,14 @@ option(SYSPROP_BUILD_BENCHMARKS "Build benchmarks"   OFF)
 option(SYSPROP_BUILD_EXAMPLES   "Build examples"     OFF)
 
 # ── Configurable defaults ──────────────────────────────────────────────────────
-set(SYSPROP_RUNTIME_DIR    "/run/sysprop/props"       CACHE STRING "Default runtime property directory")
-set(SYSPROP_PERSISTENT_DIR "/etc/sysprop/persistent"  CACHE STRING "Default persistent property directory")
-set(SYSPROP_MAX_KEY_LENGTH   256 CACHE STRING "Maximum property key length in bytes")
-set(SYSPROP_MAX_VALUE_LENGTH 256 CACHE STRING "Maximum property value length in bytes")
+set(SYSPROP_RUNTIME_DIR      "/run/sysprop/props"      CACHE STRING "Volatile property directory (cleared on reboot)")
+set(SYSPROP_PERSISTENT_DIR   "/etc/sysprop/persistent" CACHE STRING "Persistent property directory (survives reboot); empty string disables persistence")
+set(SYSPROP_MAX_KEY_LENGTH   256                        CACHE STRING "Property key buffer size in bytes, including null terminator")
+set(SYSPROP_MAX_VALUE_LENGTH 256                        CACHE STRING "Property value buffer size in bytes, including null terminator")
+# SYSPROP_ENABLE_PERSISTENCE is derived: 1 when SYSPROP_PERSISTENT_DIR is non-empty, else 0.
+set(SYSPROP_ENABLE_PERSISTENCE 1)
 if(SYSPROP_PERSISTENT_DIR STREQUAL "")
     set(SYSPROP_ENABLE_PERSISTENCE 0)
-else()
-    set(SYSPROP_ENABLE_PERSISTENCE 1)
 endif()
 
 # ── Compile flags ──────────────────────────────────────────────────────────────

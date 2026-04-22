@@ -20,27 +20,18 @@
 #  include <stdint.h>
 #endif
 
-// ── Configurable compile-time defaults ────────────────────────────────────────
-// Compile-time defaults. Override via CMake cache (-DSYSPROP_RUNTIME_DIR="...").
-// The library auto-initializes using these values before main() runs.
-
-#ifndef SYSPROP_RUNTIME_DIR
-#  define SYSPROP_RUNTIME_DIR "/run/sysprop/props"
-#endif
-#ifndef SYSPROP_PERSISTENT_DIR
-#  define SYSPROP_PERSISTENT_DIR "/etc/sysprop/persistent"
-#endif
-// Buffer sizes including the null terminator.
-// Max string length is (SYSPROP_MAX_KEY_LENGTH - 1) and (SYSPROP_MAX_VALUE_LENGTH - 1).
-#ifndef SYSPROP_MAX_KEY_LENGTH
-#  define SYSPROP_MAX_KEY_LENGTH 256
-#endif
-#ifndef SYSPROP_MAX_VALUE_LENGTH
-#  define SYSPROP_MAX_VALUE_LENGTH 256
-#endif
-#ifndef SYSPROP_ENABLE_PERSISTENCE
-#  define SYSPROP_ENABLE_PERSISTENCE 1
-#endif
+// ── Compile-time configuration ────────────────────────────────────────────────
+// These macros are injected by the build system (see CMakeLists.txt).
+// Defaults live in CMakeLists.txt; override via CMake cache variables:
+//   -DSYSPROP_RUNTIME_DIR=...  -DSYSPROP_PERSISTENT_DIR=...
+//   -DSYSPROP_MAX_KEY_LENGTH=N  -DSYSPROP_MAX_VALUE_LENGTH=N
+//
+// SYSPROP_RUNTIME_DIR     — volatile property directory (cleared on reboot)
+// SYSPROP_PERSISTENT_DIR  — persistent property directory (survives reboot);
+//                           empty string disables persistence
+// SYSPROP_MAX_KEY_LENGTH  — buffer size for a key, including null terminator
+// SYSPROP_MAX_VALUE_LENGTH — buffer size for a value, including null terminator
+// SYSPROP_ENABLE_PERSISTENCE — 1 if SYSPROP_PERSISTENT_DIR is non-empty, else 0
 
 // ── Error codes ───────────────────────────────────────────────────────────────
 // Negative = error; 0 = success. Functions returning a byte count return a
