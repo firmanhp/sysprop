@@ -41,7 +41,7 @@
 // Negative = error; 0 = success. Functions returning a byte count return a
 // positive value on success.
 
-#define SYSPROP_OK                    0 // NOLINT(cppcoreguidelines-macro-usage) -- must be a macro so the header stays valid C
+#define SYSPROP_OK                    0
 #define SYSPROP_ERR_NOT_FOUND        (-1)
 #define SYSPROP_ERR_READ_ONLY        (-2)
 #define SYSPROP_ERR_INVALID_KEY      (-3)

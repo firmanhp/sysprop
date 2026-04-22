@@ -75,7 +75,9 @@ Checks: >-
 # advisory-only runs during development.
 WarningsAsErrors: ''
 
-HeaderFilterRegex: '.*/sysprop/(src|include)/.*'
+# sysprop.h is the public C API header; C++-specific checks don't apply there.
+# Only lint src/ and the C++ internal headers in include/.
+HeaderFilterRegex: '.*/sysprop/(src|include/sysprop/(property_store\.h|testing/.*))$'
 
 CheckOptions:
   - key: bugprone-easily-swappable-parameters.MinimumLength
