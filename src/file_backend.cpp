@@ -49,10 +49,6 @@ UniqueFd OpenWriteNew(const char* path) {
 
 }  // namespace
 
-FileBackend::FileBackend(const char* base_path) : base_path_{} {
-  std::strncpy(base_path_, base_path, kMaxBasePathSize - 1);
-}
-
 bool FileBackend::BuildPath(char* dst, std::size_t dst_len, const char* key)
     const noexcept {  // NOLINT(readability-non-const-parameter) -- dst is a write-out buffer; const
                       // would be wrong

@@ -50,10 +50,10 @@
 #   enforces #ifndef-style guards which would be inconsistent and more fragile.
 #
 # -cppcoreguidelines-avoid-non-const-global-variables:
-#   The global singleton (GlobalStore) is intentionally a non-const global,
-#   constructed via placement-new before main() via __attribute__((constructor)).
-#   This is load-bearing design; there is no alternative without heap or
-#   explicit init calls.
+#   The global singleton (GlobalStore g_instance) and the test-injection pointer
+#   (s_store_override) are intentionally non-const globals. g_instance is
+#   constant-initialized by the linker (constexpr constructor chain); it must
+#   be mutable so Set/Delete can write through it at runtime.
 #
 Checks: >-
   *,

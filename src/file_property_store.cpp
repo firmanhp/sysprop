@@ -23,10 +23,6 @@ constexpr std::string_view kPersistPrefix = "persist.";
 
 }  // namespace
 
-FilePropertyStore::FilePropertyStore(FileBackend* runtime_backend,
-                                     FileBackend* persistent_backend)
-    : runtime_(runtime_backend), persistent_(persistent_backend) {}
-
 int FilePropertyStore::Get(const char* key, char* buf, std::size_t buf_len) {
   if (const int err = ValidateKey(key); err != SYSPROP_OK) {
     return err;

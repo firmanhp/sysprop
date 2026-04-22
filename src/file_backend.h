@@ -1,7 +1,9 @@
 #pragma once
 
+#include <algorithm>
 #include <cstddef>
 #include <functional>
+#include <string_view>
 
 namespace sysprop::internal {
 
@@ -28,7 +30,14 @@ class FileBackend final {
  public:
   // base_path must point to an existing directory. The string is copied
   // internally; the caller's buffer need not outlive this constructor call.
-  explicit FileBackend(const char* base_path);
+  constexpr explicit FileBackend(const char* base_path) noexcept {
+    const std::string_view sv{base_path};
+    const std::size_t n = std::min(sv.size(), kMaxBasePathSize - 1);
+    for (std::size_t i = 0; i < n; ++i) {
+      base_path_[i] = sv[i];  // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
+    }
+    base_path_[n] = '\0';  // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
+  }
   ~FileBackend() = default;
   FileBackend(const FileBackend&) = delete;
   FileBackend& operator=(const FileBackend&) = delete;
@@ -51,7 +60,7 @@ class FileBackend final {
   [[nodiscard]] bool BuildPath(char* dst, std::size_t dst_len, const char* key) const noexcept;
 
   static constexpr std::size_t kMaxBasePathSize = 4096;
-  char base_path_[kMaxBasePathSize];
+  char base_path_[kMaxBasePathSize]{};
 };
 
 }  // namespace sysprop::internal

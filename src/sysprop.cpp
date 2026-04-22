@@ -4,8 +4,6 @@
 #include <cstring>
 #include <functional>
 #include <map>
-#include <new>  // NOLINT(misc-include-cleaner) -- required for placement new (new (s_storage) ...) even though it arrives transitively
-#include <optional>
 #include <string>
 #include <string_view>
 
@@ -24,51 +22,32 @@ using sysprop::internal::PropertyStore;
 
 // ── Global singleton ──────────────────────────────────────────────────────────
 //
-// Constructed once via __attribute__((constructor)) before main() runs.
-// Directories and persistence are baked in at compile time via CMake.
-// GetStore() returns nullptr only when both s_store_override and s_instance
-// are null — impossible after sysprop_auto_init() runs. Call sites dereference
-// the result directly; the null branch is unreachable in practice.
+// All configuration is baked in at compile time (SYSPROP_RUNTIME_DIR etc.).
+// constexpr constructors throughout the chain let the linker constant-initialize
+// g_instance before any dynamic initialization runs — no runtime work, no
+// placement-new, no __attribute__((constructor)).
 //
-// Thread safety: the constructor attribute runs before any threads are started.
-// Concurrent property access after init is safe because FileBackend operations
-// are individually atomic (rename(2)).
+// Thread safety: constant initialization completes before any dynamic init or
+// thread creation. Concurrent property access is safe because FileBackend
+// operations are individually atomic (rename(2)).
 
 struct GlobalStore {
-  GlobalStore()
+  constexpr GlobalStore()
       : runtime_{SYSPROP_RUNTIME_DIR},
-        persistent_{MakePersistent()},
-        store_{&runtime_, persistent_ ? &*persistent_ : nullptr} {}
-
-  static std::optional<FileBackend> MakePersistent() {
-    if constexpr (SYSPROP_ENABLE_PERSISTENCE) {
-      return FileBackend{SYSPROP_PERSISTENT_DIR};
-    } else {
-      return std::nullopt;
-    }
-  }
+        persistent_{SYSPROP_ENABLE_PERSISTENCE ? SYSPROP_PERSISTENT_DIR : SYSPROP_RUNTIME_DIR},
+        store_{&runtime_, SYSPROP_ENABLE_PERSISTENCE ? &persistent_ : nullptr} {}
 
   FileBackend runtime_;
-  std::optional<FileBackend> persistent_;
+  FileBackend persistent_;
   FilePropertyStore store_;
 };
 
-// Raw storage avoids any static-initializer or atexit registration.
-// Placement-new'd by sysprop_auto_init(); never explicitly destructed (lifetime
-// matches the process — the OS reclaims on exit).
-alignas(GlobalStore) unsigned char s_storage[sizeof(GlobalStore)];
-GlobalStore* s_instance = nullptr;
+GlobalStore g_instance;
 PropertyStore* s_store_override = nullptr;
 
 PropertyStore* GetStore() {
   if (s_store_override != nullptr) { return s_store_override; }
-  return s_instance ? &s_instance->store_ : nullptr;
-}
-
-__attribute__((constructor))
-void sysprop_auto_init() {
-  if (s_instance) { return; }  // guard: safe if ever used as a shared library
-  s_instance = new (s_storage) GlobalStore{};  // NOLINT(cppcoreguidelines-owning-memory) -- placement new into static storage; no heap allocation
+  return &g_instance.store_;
 }
 
 }  // namespace

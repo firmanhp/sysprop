@@ -21,7 +21,9 @@ class FilePropertyStore final : public PropertyStore {
  public:
   // runtime_backend is required. persistent_backend may be null (disables
   // persistence). Both pointers must outlive this object.
-  FilePropertyStore(FileBackend* runtime_backend, FileBackend* persistent_backend);
+  constexpr FilePropertyStore(FileBackend* runtime_backend,
+                              FileBackend* persistent_backend) noexcept
+      : runtime_(runtime_backend), persistent_(persistent_backend) {}
 
   [[nodiscard]] int Get(const char* key, char* buf, std::size_t buf_len) override;
   [[nodiscard]] int Set(const char* key, const char* value) override;
