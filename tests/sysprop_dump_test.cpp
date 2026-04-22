@@ -38,7 +38,7 @@ TEST(DumpMockTest, EmptyStoreReturnsEmptyString) {
 TEST(DumpMockTest, SingleEntryFormattedCorrectly) {
   sysprop::testing::MockPropertyStore mock;
   mock.Set("mock.key", "mock.val");
-  EXPECT_EQ(sysprop_dump(), "mock.key=mock.val\n");
+  EXPECT_EQ(sysprop_dump(), "[mock.key]: [mock.val]\n");
 }
 
 // ── DumpTest ──────────────────────────────────────────────────────────────────
@@ -86,36 +86,36 @@ sysprop::internal::PropertyStore* DumpTest::prev_store_ = nullptr;
 TEST_F(DumpTest, VolatileKeyAppearsInDump) {
   ASSERT_EQ(SYSPROP_OK, sysprop_set("dump.volatile.a", "hello"));
   const std::string out = sysprop_dump();
-  EXPECT_NE(out.find("dump.volatile.a=hello\n"), std::string::npos);
+  EXPECT_NE(out.find("[dump.volatile.a]: [hello]\n"), std::string::npos);
 }
 
 TEST_F(DumpTest, ReadOnlyKeyAppearsInDump) {
   ASSERT_EQ(SYSPROP_OK, store_->SetInit("ro.dump.version", "1.0"));
   const std::string out = sysprop_dump();
-  EXPECT_NE(out.find("ro.dump.version=1.0\n"), std::string::npos);
+  EXPECT_NE(out.find("[ro.dump.version]: [1.0]\n"), std::string::npos);
 }
 
 TEST_F(DumpTest, PersistKeyAppearsInDump) {
   ASSERT_EQ(SYSPROP_OK, sysprop_set("persist.dump.ssid", "TestNet"));
   const std::string out = sysprop_dump();
-  EXPECT_NE(out.find("persist.dump.ssid=TestNet\n"), std::string::npos);
+  EXPECT_NE(out.find("[persist.dump.ssid]: [TestNet]\n"), std::string::npos);
 }
 
 TEST_F(DumpTest, OutputIsSorted) {
   ASSERT_EQ(SYSPROP_OK, sysprop_set("dump.sort.z", "last"));
   ASSERT_EQ(SYSPROP_OK, sysprop_set("dump.sort.a", "first"));
   const std::string out = sysprop_dump();
-  const auto pos_a = out.find("dump.sort.a=first\n");
-  const auto pos_z = out.find("dump.sort.z=last\n");
+  const auto pos_a = out.find("[dump.sort.a]: [first]\n");
+  const auto pos_z = out.find("[dump.sort.z]: [last]\n");
   ASSERT_NE(pos_a, std::string::npos);
   ASSERT_NE(pos_z, std::string::npos);
   EXPECT_LT(pos_a, pos_z);
 }
 
-TEST_F(DumpTest, FormatIsKeyEqualsValue) {
+TEST_F(DumpTest, FormatIsBracketedKeyValue) {
   ASSERT_EQ(SYSPROP_OK, sysprop_set("dump.fmt.key", "myvalue"));
   const std::string out = sysprop_dump();
-  EXPECT_NE(out.find("dump.fmt.key=myvalue\n"), std::string::npos);
+  EXPECT_NE(out.find("[dump.fmt.key]: [myvalue]\n"), std::string::npos);
 }
 
 // ── CmdListTest ───────────────────────────────────────────────────────────────

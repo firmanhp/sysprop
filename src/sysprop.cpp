@@ -153,10 +153,11 @@ std::string sysprop_dump() {
   });
   std::string out;
   for (const auto& [key, value] : props) {
+    out += '[';
     out += key;
-    out += '=';
+    out += "]: [";
     out += value;
-    out += '\n';
+    out += "]\n";
   }
   return out;
 }
