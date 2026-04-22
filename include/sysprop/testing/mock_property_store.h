@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstring>
+#include <functional>
 #include <string>
 #include <unordered_map>
 
@@ -60,6 +61,14 @@ class MockPropertyStore final : public sysprop::internal::PropertyStore {
 
   int Exists(const char* key) override {
     return map_.count(key) != 0 ? SYSPROP_OK : SYSPROP_ERR_NOT_FOUND;
+  }
+
+  // Iteration order is unspecified (unordered_map); callers must not rely on ordering.
+  [[nodiscard]] int ForEach(const std::function<void(const char*, const char*)>& visitor) override {
+    for (const auto& [k, v] : map_) {
+      visitor(k.c_str(), v.c_str());
+    }
+    return SYSPROP_OK;
   }
 
  private:

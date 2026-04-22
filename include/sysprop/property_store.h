@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <functional>
 
 namespace sysprop::internal {
 
@@ -22,6 +23,10 @@ class PropertyStore {
   [[nodiscard]] virtual int Set(const char* key, const char* value) = 0;
   [[nodiscard]] virtual int Delete(const char* key) = 0;
   [[nodiscard]] virtual int Exists(const char* key) = 0;
+
+  // Calls visitor(key, value) for every property in the store.
+  // Not a hot path — callers may heap-allocate within visitor.
+  [[nodiscard]] virtual int ForEach(const std::function<void(const char*, const char*)>& visitor) = 0;
 };
 
 }  // namespace sysprop::internal

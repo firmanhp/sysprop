@@ -6,7 +6,7 @@ Always use the scripts, not raw cmake/ctest:
 
 ```bash
 scripts/build.sh              # build library + CLI tools
-scripts/test.sh               # build + run full test suite (239 tests)
+scripts/test.sh               # build + run full test suite
 scripts/test.sh -R FileBackend  # run only tests matching a pattern
 scripts/benchmark.sh          # build + run benchmarks
 scripts/lint.sh               # run clang-tidy on src/ only

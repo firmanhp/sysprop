@@ -23,4 +23,8 @@ int CmdSetprop(int argc, char* argv[], sysprop::internal::PropertyStore& store);
 //   otherwise → delete argv[1]; return 0 on success, 1 on failure
 int CmdDelete(int argc, char* argv[], sysprop::internal::PropertyStore& store);
 
+// List all properties as sorted "key=value" lines printed to stdout.
+// Equivalent to getprop with no arguments.
+int CmdList(sysprop::internal::PropertyStore& store);
+
 }  // namespace sysprop::tools

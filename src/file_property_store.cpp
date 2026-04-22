@@ -1,6 +1,7 @@
 #include "file_property_store.h"
 
 #include <cstdio>
+#include <functional>
 #include <string_view>
 
 #include <sysprop/sysprop.h>
@@ -81,6 +82,18 @@ int FilePropertyStore::Exists(const char* key) {
     return persistent_->Exists(key);
   }
   return runtime_->Exists(key);
+}
+
+int FilePropertyStore::ForEach(const std::function<void(const char*, const char*)>& visitor) {
+  // Abort on runtime failure rather than delivering a partial listing.
+  const int rc = runtime_->ForEach(visitor);
+  if (rc != SYSPROP_OK) {
+    return rc;
+  }
+  if (persistent_ != nullptr) {
+    return persistent_->ForEach(visitor);
+  }
+  return SYSPROP_OK;
 }
 
 }  // namespace sysprop::internal

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <functional>
 
 namespace sysprop::internal {
 
@@ -38,6 +39,11 @@ class FileBackend final {
   [[nodiscard]] int Set(const char* key, const char* value);
   [[nodiscard]] int Delete(const char* key);
   [[nodiscard]] int Exists(const char* key);
+
+  // Calls visitor(key, value) for every property in the directory.
+  // Skips dot-prefixed filenames (temp files, ".", "..").
+  // Not a hot path — heap allocation via std::function is acceptable here.
+  [[nodiscard]] int ForEach(const std::function<void(const char*, const char*)>& visitor);
 
  private:
   // Writes the full path for key into dst. Returns false if the result would

@@ -7,6 +7,7 @@ add_executable(sysprop_tests
     sysprop_init_test.cpp
     sysprop_main_test.cpp
     sysprop_init_helpers_test.cpp
+    sysprop_dump_test.cpp
 )
 
 target_link_libraries(sysprop_tests

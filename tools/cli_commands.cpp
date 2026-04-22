@@ -1,6 +1,8 @@
 #include "cli_commands.h"
 
 #include <iostream>
+#include <map>
+#include <string>
 
 #include <sysprop/sysprop.h>
 
@@ -55,6 +57,21 @@ int CmdDelete(int argc, char* argv[], sysprop::internal::PropertyStore& store) {
   if (const int rc = store.Delete(argv[1]); rc != SYSPROP_OK) {
     std::cerr << "sysprop delete: failed to delete '" << argv[1] << "': " << sysprop_error_string(rc) << '\n';
     return 1;
+  }
+  return 0;
+}
+
+int CmdList(sysprop::internal::PropertyStore& store) {
+  std::map<std::string, std::string> props;
+  const int rc = store.ForEach([&props](const char* key, const char* value) {
+    props[key] = value;
+  });
+  if (rc != SYSPROP_OK) {
+    std::cerr << "list: error reading properties: " << sysprop_error_string(rc) << '\n';
+    return 1;
+  }
+  for (const auto& [key, value] : props) {
+    std::cout << key << '=' << value << '\n';
   }
   return 0;
 }

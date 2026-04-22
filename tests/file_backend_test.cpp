@@ -5,6 +5,7 @@
 #include <cerrno>
 #include <cstdio>
 #include <cstring>
+#include <map>
 #include <memory>
 #include <string>
 #include <thread>
@@ -248,4 +249,46 @@ TEST_F(FileBackendTest, ConcurrentReadWriteNoCrash) {
 
   writer.join();
   reader.join();
+}
+
+// ── ForEach ───────────────────────────────────────────────────────────────────
+
+TEST_F(FileBackendTest, ForEachEmptyDirVisitsNothing) {
+  std::vector<std::string> keys;
+  const int rc = backend_->ForEach([&](const char* k, const char*) { keys.push_back(k); });
+  EXPECT_EQ(SYSPROP_OK, rc);
+  EXPECT_TRUE(keys.empty());
+}
+
+TEST_F(FileBackendTest, ForEachVisitsAllProperties) {
+  ASSERT_EQ(SYSPROP_OK, backend_->Set("a.key", "alpha"));
+  ASSERT_EQ(SYSPROP_OK, backend_->Set("b.key", "beta"));
+
+  std::map<std::string, std::string> seen;
+  const int rc = backend_->ForEach([&](const char* k, const char* v) { seen[k] = v; });
+  EXPECT_EQ(SYSPROP_OK, rc);
+  ASSERT_EQ(2u, seen.size());
+  EXPECT_EQ("alpha", seen["a.key"]);
+  EXPECT_EQ("beta", seen["b.key"]);
+}
+
+TEST_F(FileBackendTest, ForEachSkipsTmpFiles) {
+  // Plant a .tmp.* file directly — ForEach must not visit it.
+  const std::string tmp_file = tmp_dir_ + "/.tmp.a.key.99999";
+  FILE* f = std::fopen(tmp_file.c_str(), "w");
+  ASSERT_NE(f, nullptr);
+  std::fputs("should-be-hidden", f);
+  std::fclose(f);
+
+  std::vector<std::string> keys;
+  const int rc = backend_->ForEach([&](const char* k, const char*) { keys.push_back(k); });
+  EXPECT_EQ(SYSPROP_OK, rc);
+  EXPECT_TRUE(keys.empty());
+}
+
+TEST_F(FileBackendTest, ForEachNonexistentDirReturnsError) {
+  const std::string ghost = testing::TempDir() + "sysprop_foreach_ghost_XXXXXX";
+  FileBackend bad{ghost.c_str()};
+  const int rc = bad.ForEach([](const char*, const char*) {});
+  EXPECT_NE(SYSPROP_OK, rc);
 }

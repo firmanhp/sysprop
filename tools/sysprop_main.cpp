@@ -35,8 +35,9 @@ void PrintUsage(const char* prog) {
                "Usage:\n"
                "  %s get key [default]  -- print property value\n"
                "  %s set key value      -- set a property\n"
-               "  %s delete key         -- delete a property\n",
-               prog, prog, prog);
+               "  %s delete key         -- delete a property\n"
+               "  %s list               -- list all properties\n",
+               prog, prog, prog, prog);
 }
 
 }  // namespace
@@ -55,7 +56,10 @@ int main(int argc, char* argv[]) {
 
   const std::string_view name{prog};
 
-  if (name == "getprop") return sysprop::tools::CmdGetprop(argc, argv, store);
+  if (name == "getprop") {
+    if (argc < 2) return sysprop::tools::CmdList(store);
+    return sysprop::tools::CmdGetprop(argc, argv, store);
+  }
   if (name == "setprop") return sysprop::tools::CmdSetprop(argc, argv, store);
 
   // Invoked as "sysprop <subcommand> ..."
@@ -68,6 +72,7 @@ int main(int argc, char* argv[]) {
   if (cmd == "get") return sysprop::tools::CmdGetprop(argc - 1, argv + 1, store);
   if (cmd == "set") return sysprop::tools::CmdSetprop(argc - 1, argv + 1, store);
   if (cmd == "delete") return sysprop::tools::CmdDelete(argc - 1, argv + 1, store);
+  if (cmd == "list") return sysprop::tools::CmdList(store);
 
   std::fprintf(stderr, "sysprop: unknown command '%s'\n", argv[1]);
   PrintUsage(prog);

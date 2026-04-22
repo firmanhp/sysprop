@@ -1,11 +1,13 @@
 #include "file_backend.h"
 
+#include <dirent.h>
 #include <fcntl.h>
 #include <unistd.h>
 
 #include <cerrno>
 #include <cstdio>
 #include <cstring>
+#include <functional>
 
 #include <sysprop/sysprop.h>
 
@@ -146,6 +148,31 @@ int FileBackend::Exists(const char* key) {
   if (::access(path, F_OK) == 0) { return SYSPROP_OK; }
   if (errno == EACCES || errno == EPERM) { return SYSPROP_ERR_PERMISSION; }
   return SYSPROP_ERR_NOT_FOUND;
+}
+
+int FileBackend::ForEach(const std::function<void(const char*, const char*)>& visitor) {
+  DIR* dir = ::opendir(base_path_);
+  if (dir == nullptr) {
+    if (errno == EACCES || errno == EPERM) { return SYSPROP_ERR_PERMISSION; }
+    return SYSPROP_ERR_IO;
+  }
+
+  char val[SYSPROP_MAX_VALUE_LENGTH];
+  const struct dirent* entry = nullptr;
+  errno = 0;
+  while ((entry = ::readdir(dir)) != nullptr) {  // NOLINT(concurrency-mt-unsafe) -- local DIR*
+    if (entry->d_name[0] == '.') {
+      continue;  // skip ".", "..", and ".tmp.*" temp files
+    }
+    const int n = Get(entry->d_name, val, sizeof(val));
+    if (n >= 0) {
+      visitor(entry->d_name, val);
+    }
+    errno = 0;
+  }
+
+  ::closedir(dir);
+  return (errno != 0) ? SYSPROP_ERR_IO : SYSPROP_OK;
 }
 
 }  // namespace sysprop::internal

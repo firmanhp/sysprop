@@ -2,8 +2,11 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <functional>
+#include <map>
 #include <new>  // NOLINT(misc-include-cleaner) -- required for placement new (new (s_storage) ...) even though it arrives transitively
 #include <optional>
+#include <string>
 #include <string_view>
 
 #include <sysprop/sysprop.h>
@@ -160,6 +163,24 @@ float sysprop_get_float(const char* key, float default_value) {
 }
 
 }  // extern "C"
+
+std::string sysprop_dump() {
+  std::map<std::string, std::string> props;
+  // On I/O error, ForEach returns a negative code and props is partial or empty.
+  // sysprop_dump() returns whatever was collected; callers that need to distinguish
+  // I/O failure from an empty store should use PropertyStore::ForEach directly.
+  (void)GetStore()->ForEach([&props](const char* key, const char* value) {
+    props[key] = value;
+  });
+  std::string out;
+  for (const auto& [key, value] : props) {
+    out += key;
+    out += '=';
+    out += value;
+    out += '\n';
+  }
+  return out;
+}
 
 namespace sysprop::testing {
 

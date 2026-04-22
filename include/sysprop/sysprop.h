@@ -96,5 +96,10 @@ inline std::string sysprop_get(const char* key, std::string default_value) {
     if (n < 0) { return default_value; }
     return std::string(buf, static_cast<std::string::size_type>(n));
 }
+
+// Returns all properties as a sorted "key=value\n" string.
+// Includes both runtime (volatile, ro.*) and persistent (persist.*) properties.
+// Heap-allocates; intended for diagnostics and tooling, not hot paths.
+std::string sysprop_dump();
 #endif  // __cplusplus
 
