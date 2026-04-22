@@ -45,7 +45,7 @@ src/validation.cpp/h                    ← key/value validation only
 
 **Key charset is `[a-zA-Z0-9._-]`.** This is what makes the key safe to use as a filename directly. `ValidateKey` enforces this. Do not relax it.
 
-**`ro.*` policy uses `Exists()` check**, not filesystem permissions. Bare `ro` (no dot) is mutable. Only keys starting with `"ro."` are read-only.
+**`ro.*` is enforced at two levels.** `FilePropertyStore::Set()` unconditionally rejects any `ro.*` key with `SYSPROP_ERR_READ_ONLY` — even the first write. `FilePropertyStore::SetInit()` is the privileged write path used exclusively by `sysprop-init` (via `LoadDefaultsFile`); it checks `Exists()` and allows a one-time write, rejecting all subsequent calls. Bare `ro` (no dot) is mutable. Do not add any other callers of `SetInit()`.
 
 **`persist.*` operations go directly to persistent backend.** Get/Set/Delete/Exists for `persist.*` keys bypass the runtime backend entirely. If no persistent backend is configured, operations fall back to runtime.
 
@@ -61,12 +61,13 @@ Most tests use real `FileBackend` + `mkdtemp`-created temp dirs. `MockPropertySt
 
 Test files and what they cover:
 - `validation_test.cpp` — `ValidateKey` / `ValidateValue` only; no I/O
-- `file_backend_test.cpp` — raw storage, atomicity, concurrency, filesystem attacks
-- `file_property_store_test.cpp` — policy enforcement (ro, persist, validation delegation)
+- `file_backend_test.cpp` — raw storage, atomicity, concurrency, filesystem attacks, `ForEach` iteration
+- `file_property_store_test.cpp` — policy enforcement (ro, persist, validation delegation); `SetInit` write-once semantics
 - `mock_property_store_test.cpp` — in-memory mock: direct usage and RAII injection into `sysprop_xxx()` API
 - `integration_test.cpp` — end-to-end through the C API; includes `GlobalApiTest` (singleton, typed helpers) and evil-attacker scenarios
 - `sysprop_init_test.cpp` — `LoadDefaultsFile` (build.prop parsing, validation, ro/persist semantics)
-- `sysprop_main_test.cpp` — CLI commands: `DoList`, `CmdGetprop`, `CmdSetprop`, `CmdDelete`
+- `sysprop_dump_test.cpp` — `sysprop_dump()` output format/sorting and `CmdList` output
+- `sysprop_main_test.cpp` — CLI commands: `CmdGetprop`, `CmdSetprop` (quote stripping, empty→delete), `CmdDelete`, `CmdList`
 - `sysprop_init_helpers_test.cpp` — `MkdirP`, `CleanupTmpFiles`, `ParseInitArgs`
 
 `GlobalApiTest` uses `SetUpTestSuite`/`TearDownTestSuite` (static) to inject a real `FilePropertyStore` (backed by `mkdtemp` dirs) via `swap_store()`, because the singleton auto-inits to the compiled-in dirs which are not writable in the test environment. Each test uses a unique key prefix to avoid cross-test interference.

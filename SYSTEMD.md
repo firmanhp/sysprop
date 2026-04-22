@@ -163,14 +163,15 @@ Key naming rules:
 - Allowed characters: `a–z A–Z 0–9 . _ -`
 - No leading/trailing dots, no consecutive dots
 - Maximum length: 255 bytes for both key and value
-- `ro.*` — read-only after first set; any later attempt to change them is rejected
+- `ro.*` — written only by `sysprop-init` from `build.prop`; all runtime writes (including the very first) are rejected
 - `persist.*` — stored on disk; survives reboots
 - Everything else — volatile; lost on reboot
 
-> **Note:** `ro.*` properties set from `build.prop` become immutable for the
-> lifetime of that boot. They must be present in `build.prop` (or set by a
-> service before any other service tries to write them) because the runtime
-> tmpfs is cleared on every reboot.
+> **Note:** `ro.*` properties live in the runtime tmpfs, which is cleared on
+> every reboot. They must be listed in `build.prop` so that `sysprop-init`
+> re-populates them on every boot. Once written by `sysprop-init`, they are
+> immutable for the lifetime of that boot — no process (including root) can
+> overwrite or delete them via the `sysprop` API.
 
 ---
 
@@ -191,21 +192,32 @@ sysprop set net.hostname my-device
 setprop net.hostname my-device     # same, using the setprop alias
 ```
 
-Attempting to overwrite a `ro.*` property will fail:
+Attempting to write any `ro.*` property at runtime will fail, even the first time:
 
 ```bash
 $ sysprop set ro.build.version evil
 setprop: failed to set 'ro.build.version': read-only property
 ```
 
+`ro.*` properties can only be set by `sysprop-init` at boot (from `build.prop`).
+
 ### Delete a property
 
 ```bash
 sysprop delete net.hostname
+setprop net.hostname ""    # empty value is equivalent to delete
 ```
 
-`ro.*` properties cannot be deleted. `persist.*` properties are deleted from
-the persistent directory on disk.
+`ro.*` properties cannot be deleted.
+
+### List all properties
+
+```bash
+sysprop list    # prints key=value lines, sorted
+getprop         # same (getprop with no arguments lists all properties)
+```
+
+`persist.*` properties are deleted from the persistent directory on disk.
 
 ---
 

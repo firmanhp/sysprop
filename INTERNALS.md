@@ -76,6 +76,12 @@ the runtime tmpfs. Consequently:
 is cleared on reboot, any `ro.*` properties needed across reboots must be
 re-set from a defaults file on every boot (the job of `sysprop-init`).
 
+`ro.*` properties may only be written via `PropertyStore::SetInit()`, which is
+called exclusively by `LoadDefaultsFile()` inside `sysprop-init`. The regular
+`PropertyStore::Set()` unconditionally rejects `ro.*` keys with
+`SYSPROP_ERR_READ_ONLY` — even on the first call. `SetInit()` itself is
+write-once: the second call for the same key returns `SYSPROP_ERR_READ_ONLY`.
+
 ---
 
 ## Auto-Initialization Singleton

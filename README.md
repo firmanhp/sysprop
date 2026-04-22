@@ -11,7 +11,7 @@ named files in a tmpfs directory — no daemon, no IPC, no shared memory.
 | Key prefix | Behaviour |
 |---|---|
 | _(none)_ | Volatile — stored in tmpfs; lost on reboot |
-| `ro.*` | Read-only — can be set exactly once; subsequent sets are rejected |
+| `ro.*` | Read-only — written exclusively by `sysprop-init` at boot (from `build.prop`); all runtime writes are rejected |
 | `persist.*` | Persistent — stored on disk in `SYSPROP_PERSISTENT_DIR`; survives reboots |
 
 Only keys that begin with the literal string `ro.` are read-only. The bare key
@@ -163,14 +163,27 @@ getprop missing.key "default-value"
 sysprop set device.name my-board
 setprop device.name my-board
 
+# Set with surrounding quotes — quotes are stripped before storing
+setprop device.name "my-board"
+
 # Delete a property
 sysprop delete device.name
+
+# Delete via setprop (empty value = delete)
+setprop device.name ""
+
+# List all properties (sorted)
+sysprop list
+getprop
 ```
 
 `getprop` and `setprop` are symlinks to `sysprop`.
 
-`ro.*` properties cannot be overwritten or deleted. `persist.*` properties are
-written to and read from the persistent directory on disk.
+`ro.*` properties are written exclusively by `sysprop-init` at boot (from
+`build.prop`). Any call to `sysprop set` or `sysprop_set()` on an `ro.*` key
+is rejected with `SYSPROP_ERR_READ_ONLY`, even if the property does not yet
+exist. `persist.*` properties are written to and read from the persistent
+directory on disk.
 
 ---
 
@@ -220,16 +233,16 @@ float   sysprop_get_float(const char* key, float default_value);
 #include <sysprop/sysprop.h>
 
 int main(void) {
-    /* Runtime directory must exist before Set() (sysprop-init creates it). */
+    /* Runtime directory must exist (sysprop-init creates it at boot). */
     sysprop_set("device.name", "my-board");
-    sysprop_set("ro.build.version", "1.0.0");
 
     char buf[SYSPROP_MAX_VALUE_LENGTH];
     if (sysprop_get("device.name", buf, sizeof(buf)) >= 0)
         printf("device.name = %s\n", buf);
 
-    /* ro.* properties are write-once. */
-    int rc = sysprop_set("ro.build.version", "2.0.0");
+    /* ro.* properties are set only by sysprop-init (from build.prop).
+       sysprop_set() always rejects them. */
+    int rc = sysprop_set("ro.build.version", "1.0.0");
     printf("%s\n", sysprop_error_string(rc));  /* "read-only property" */
 
     return 0;
@@ -246,7 +259,6 @@ int main(void) {
 
 int main() {
     sysprop_set("device.name", "my-board");
-    sysprop_set("ro.build.version", "1.0.0");
 
     std::array<char, SYSPROP_MAX_VALUE_LENGTH> buf{};
     if (sysprop_get("device.name", buf.data(), buf.size()) >= 0)
@@ -260,8 +272,9 @@ int main() {
     /* C++ string overload (defined in the header). */
     std::string v = sysprop_get("device.name", std::string{"unknown"});
 
-    /* ro.* is write-once. */
-    std::printf("%s\n", sysprop_error_string(sysprop_set("ro.build.version", "2.0.0")));
+    /* ro.* properties are set only by sysprop-init; sysprop_set() always
+       rejects them regardless of whether the property already exists. */
+    std::printf("%s\n", sysprop_error_string(sysprop_set("ro.build.version", "1.0.0")));
 }
 ```
 
