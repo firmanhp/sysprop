@@ -4,7 +4,9 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#include <atomic>
 #include <cerrno>
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <functional>
@@ -17,7 +19,7 @@ namespace {
 
 // Maximum size of a path buffer we construct:
 //   base_path (up to PATH_MAX) + '/' + key (SYSPROP_MAX_KEY_LENGTH) + nul
-// An extra 64 bytes covers the ".tmp.<key>.<pid>" suffix used during writes.
+// An extra 64 bytes covers the ".tmp.<key>.<pid>.<token>" suffix used during writes.
 // 4096 == FileBackend::kMaxBasePathSize — must stay in sync if that changes.
 constexpr std::size_t kPathBufSize = 4096 + SYSPROP_MAX_KEY_LENGTH + 64;
 constexpr int kFileMode = 0644;
@@ -90,8 +92,10 @@ int FileBackend::Set(const char* key, const char* value) {
     return SYSPROP_ERR_IO;
   }
 
-  const int n = std::snprintf(tmp_path, sizeof(tmp_path), "%s/.tmp.%s.%d", base_path_, key,
-                              static_cast<int>(::getpid()));
+  static std::atomic<uint32_t> token_counter{0};
+  const uint32_t token = token_counter.fetch_add(1, std::memory_order_relaxed);
+  const int n = std::snprintf(tmp_path, sizeof(tmp_path), "%s/.tmp.%s.%d.%08x", base_path_, key,
+                              static_cast<int>(::getpid()), token);
   if (n <= 0 || static_cast<std::size_t>(n) >= sizeof(tmp_path)) {
     return SYSPROP_ERR_IO;
   }

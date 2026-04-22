@@ -12,7 +12,7 @@ namespace sysprop::internal {
 //
 // Atomicity:
 //   Writes are atomic: the value is written to a temporary file
-//   (.tmp.<key>.<pid>) and then rename(2)'d into place. rename(2) is
+//   (.tmp.<key>.<pid>.<token>) and then rename(2)'d into place. rename(2) is
 //   guaranteed to be atomic on the same filesystem by POSIX, so concurrent
 //   readers will see either the old value or the new value — never a partial
 //   write.
