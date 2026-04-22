@@ -10,12 +10,12 @@
 #include <sysprop/sysprop.h>
 
 #include "file_backend.h"
-#include "property_store.h"
+#include "file_property_store.h"
 
 namespace {
 
 using sysprop::internal::FileBackend;
-using sysprop::internal::PropertyStore;
+using sysprop::internal::FilePropertyStore;
 
 // ── Fixture helpers ───────────────────────────────────────────────────────────
 
@@ -27,7 +27,7 @@ std::string MakeTmpDir() {
 }
 
 // Pre-populate a store with n properties named "bench.key.000000", etc.
-void Populate(PropertyStore& store, int n) {
+void Populate(FilePropertyStore& store, int n) {
   char key[SYSPROP_MAX_KEY_LENGTH];
   for (int i = 0; i < n; ++i) {
     std::snprintf(key, sizeof(key), "bench.key.%06d", i);
@@ -40,7 +40,7 @@ void Populate(PropertyStore& store, int n) {
 void BM_Get(benchmark::State& state) {
   const auto dir = MakeTmpDir();
   FileBackend backend{dir.c_str()};
-  PropertyStore store{&backend, nullptr};
+  FilePropertyStore store{&backend, nullptr};
   (void)store.Set("bench.target", "hello_world");
 
   char buf[SYSPROP_MAX_VALUE_LENGTH];
@@ -54,7 +54,7 @@ BENCHMARK(BM_Get);
 void BM_GetMissing(benchmark::State& state) {
   const auto dir = MakeTmpDir();
   FileBackend backend{dir.c_str()};
-  PropertyStore store{&backend, nullptr};
+  FilePropertyStore store{&backend, nullptr};
 
   char buf[SYSPROP_MAX_VALUE_LENGTH];
   for (auto _ : state) {
@@ -67,7 +67,7 @@ BENCHMARK(BM_GetMissing);
 void BM_Set(benchmark::State& state) {
   const auto dir = MakeTmpDir();
   FileBackend backend{dir.c_str()};
-  PropertyStore store{&backend, nullptr};
+  FilePropertyStore store{&backend, nullptr};
 
   for (auto _ : state) {
     benchmark::DoNotOptimize(store.Set("bench.write.key", "benchmark_value"));
@@ -79,7 +79,7 @@ BENCHMARK(BM_Set);
 void BM_List(benchmark::State& state) {
   const auto dir = MakeTmpDir();
   FileBackend backend{dir.c_str()};
-  PropertyStore store{&backend, nullptr};
+  FilePropertyStore store{&backend, nullptr};
   Populate(store, static_cast<int>(state.range(0)));
 
   for (auto _ : state) {
@@ -101,13 +101,13 @@ void BM_ConcurrentReads(benchmark::State& state) {
   // tears down; all threads execute the inner loop in parallel.
   static char shared_dir[4096];
   static std::unique_ptr<FileBackend> shared_backend;
-  static std::unique_ptr<PropertyStore> shared_store;
+  static std::unique_ptr<FilePropertyStore> shared_store;
 
   if (state.thread_index() == 0) {
     std::strncpy(shared_dir, MakeTmpDir().c_str(), sizeof(shared_dir) - 1);
     shared_dir[sizeof(shared_dir) - 1] = '\0';
     shared_backend = std::make_unique<FileBackend>(shared_dir);
-    shared_store = std::make_unique<PropertyStore>(shared_backend.get(), nullptr);
+    shared_store = std::make_unique<FilePropertyStore>(shared_backend.get(), nullptr);
     (void)shared_store->Set("shared.read.key", "shared_value");
   }
 
