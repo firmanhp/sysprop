@@ -35,7 +35,7 @@ struct GlobalStore {
   constexpr GlobalStore()
       : runtime_{SYSPROP_RUNTIME_DIR},
         persistent_{SYSPROP_ENABLE_PERSISTENCE ? SYSPROP_PERSISTENT_DIR : SYSPROP_RUNTIME_DIR},
-        store_{&runtime_, SYSPROP_ENABLE_PERSISTENCE ? &persistent_ : nullptr} {}
+        store_{runtime_, persistent_} {}
 
   FileBackend runtime_;
   FileBackend persistent_;

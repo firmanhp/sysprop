@@ -57,7 +57,7 @@ class DumpTest : public ::testing::Test {
     ps_dir_ = ps;
     rt_backend_  = std::make_unique<FileBackend>(rt_dir_.c_str());
     ps_backend_  = std::make_unique<FileBackend>(ps_dir_.c_str());
-    store_       = std::make_unique<FilePropertyStore>(rt_backend_.get(), ps_backend_.get());
+    store_       = std::make_unique<FilePropertyStore>(*rt_backend_, *ps_backend_);
     prev_store_  = swap_store(store_.get());
   }
 
@@ -132,7 +132,7 @@ class CmdListTest : public ::testing::Test {
     ASSERT_NE(d, nullptr) << strerror(errno);
     dir_ = d;
     runtime_ = std::make_unique<FileBackend>(dir_.c_str());
-    store_   = std::make_unique<FilePropertyStore>(runtime_.get(), nullptr);
+    store_   = std::make_unique<FilePropertyStore>(*runtime_, *runtime_);
   }
 
   void TearDown() override {

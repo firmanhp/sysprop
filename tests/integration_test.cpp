@@ -35,7 +35,7 @@ class IntegrationTest : public ::testing::Test {
 
     rt_backend_ = std::make_unique<FileBackend>(rt_dir_.c_str());
     ps_backend_ = std::make_unique<FileBackend>(ps_dir_.c_str());
-    store_ = std::make_unique<FilePropertyStore>(rt_backend_.get(), ps_backend_.get());
+    store_ = std::make_unique<FilePropertyStore>(*rt_backend_, *ps_backend_);
   }
 
   std::string rt_dir_;
@@ -123,7 +123,7 @@ TEST_F(IntegrationTest, PersistPropertiesAccessibleAfterReboot) {
 
   {
     FileBackend new_runtime{new_rt_dir.c_str()};
-    FilePropertyStore new_store{&new_runtime, ps_backend_.get()};
+    FilePropertyStore new_store{new_runtime, *ps_backend_};
 
     // persist.* reads directly from persistent_ — no LoadPersistentProperties needed.
     const int n = new_store.Get("persist.sys.timezone", buf_, sizeof(buf_));
@@ -145,7 +145,7 @@ TEST_F(IntegrationTest, MultiplePersistPropsAccessibleAfterReboot) {
 
   {
     FileBackend new_runtime{new_rt_dir.c_str()};
-    FilePropertyStore new_store{&new_runtime, ps_backend_.get()};
+    FilePropertyStore new_store{new_runtime, *ps_backend_};
 
     for (const char* key : {"persist.a", "persist.b", "persist.c"}) {
       const int n = new_store.Get(key, buf_, sizeof(buf_));
@@ -238,7 +238,7 @@ TEST_F(IntegrationTest, TwoStoresOnSameRuntimeDirRoFirstWins) {
   // service runs before any other process starts.
   FileBackend shared_rt{rt_dir_.c_str()};
   FileBackend shared_ps{ps_dir_.c_str()};
-  FilePropertyStore store2{&shared_rt, &shared_ps};
+  FilePropertyStore store2{shared_rt, shared_ps};
 
   ASSERT_EQ(SYSPROP_OK, store_->SetInit("ro.race.key", "first"));
   EXPECT_EQ(SYSPROP_ERR_READ_ONLY, store2.SetInit("ro.race.key", "second"));
@@ -281,7 +281,7 @@ class GlobalApiTest : public ::testing::Test {
     ps_dir_ = ps;
     rt_backend_  = std::make_unique<FileBackend>(rt_dir_.c_str());
     ps_backend_  = std::make_unique<FileBackend>(ps_dir_.c_str());
-    suite_store_ = std::make_unique<FilePropertyStore>(rt_backend_.get(), ps_backend_.get());
+    suite_store_ = std::make_unique<FilePropertyStore>(*rt_backend_, *ps_backend_);
     prev_store_  = swap_store(suite_store_.get());
   }
 

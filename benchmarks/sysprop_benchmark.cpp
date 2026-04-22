@@ -40,7 +40,7 @@ void Populate(FilePropertyStore& store, int n) {
 void BM_Get(benchmark::State& state) {
   const auto dir = MakeTmpDir();
   FileBackend backend{dir.c_str()};
-  FilePropertyStore store{&backend, nullptr};
+  FilePropertyStore store{backend, backend};
   (void)store.Set("bench.target", "hello_world");
 
   char buf[SYSPROP_MAX_VALUE_LENGTH];
@@ -54,7 +54,7 @@ BENCHMARK(BM_Get);
 void BM_GetMissing(benchmark::State& state) {
   const auto dir = MakeTmpDir();
   FileBackend backend{dir.c_str()};
-  FilePropertyStore store{&backend, nullptr};
+  FilePropertyStore store{backend, backend};
 
   char buf[SYSPROP_MAX_VALUE_LENGTH];
   for (auto _ : state) {
@@ -67,7 +67,7 @@ BENCHMARK(BM_GetMissing);
 void BM_Set(benchmark::State& state) {
   const auto dir = MakeTmpDir();
   FileBackend backend{dir.c_str()};
-  FilePropertyStore store{&backend, nullptr};
+  FilePropertyStore store{backend, backend};
 
   for (auto _ : state) {
     benchmark::DoNotOptimize(store.Set("bench.write.key", "benchmark_value"));
@@ -79,7 +79,7 @@ BENCHMARK(BM_Set);
 void BM_List(benchmark::State& state) {
   const auto dir = MakeTmpDir();
   FileBackend backend{dir.c_str()};
-  FilePropertyStore store{&backend, nullptr};
+  FilePropertyStore store{backend, backend};
   Populate(store, static_cast<int>(state.range(0)));
 
   for (auto _ : state) {
@@ -107,7 +107,7 @@ void BM_ConcurrentReads(benchmark::State& state) {
     std::strncpy(shared_dir, MakeTmpDir().c_str(), sizeof(shared_dir) - 1);
     shared_dir[sizeof(shared_dir) - 1] = '\0';
     shared_backend = std::make_unique<FileBackend>(shared_dir);
-    shared_store = std::make_unique<FilePropertyStore>(shared_backend.get(), nullptr);
+    shared_store = std::make_unique<FilePropertyStore>(*shared_backend, *shared_backend);
     (void)shared_store->Set("shared.read.key", "shared_value");
   }
 

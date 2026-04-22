@@ -11,7 +11,6 @@
 
 #include <cstdio>
 #include <cstring>
-#include <memory>
 #include <string_view>
 
 #include <sysprop/sysprop.h>
@@ -48,11 +47,8 @@ int main(int argc, char* argv[]) {
   const char* prog = ProgName(argv[0]);
 
   FileBackend runtime_backend(SYSPROP_RUNTIME_DIR);
-  std::unique_ptr<FileBackend> persistent_backend;
-  if (SYSPROP_ENABLE_PERSISTENCE) {
-    persistent_backend = std::make_unique<FileBackend>(SYSPROP_PERSISTENT_DIR);
-  }
-  FilePropertyStore store(&runtime_backend, persistent_backend.get());
+  FileBackend persistent_backend(SYSPROP_ENABLE_PERSISTENCE ? SYSPROP_PERSISTENT_DIR : SYSPROP_RUNTIME_DIR);
+  FilePropertyStore store(runtime_backend, persistent_backend);
 
   const std::string_view name{prog};
 

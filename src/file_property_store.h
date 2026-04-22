@@ -19,10 +19,9 @@ namespace sysprop::internal {
 // All key and value inputs are validated before any backend operation.
 class FilePropertyStore final : public PropertyStore {
  public:
-  // runtime_backend is required. persistent_backend may be null (disables
-  // persistence). Both pointers must outlive this object.
-  constexpr FilePropertyStore(FileBackend* runtime_backend,
-                              FileBackend* persistent_backend) noexcept
+  // Both backends must outlive this object.
+  constexpr FilePropertyStore(FileBackend& runtime_backend,
+                              FileBackend& persistent_backend) noexcept
       : runtime_(runtime_backend), persistent_(persistent_backend) {}
 
   [[nodiscard]] int Get(const char* key, char* buf, std::size_t buf_len) override;
@@ -33,8 +32,8 @@ class FilePropertyStore final : public PropertyStore {
   [[nodiscard]] int ForEach(const std::function<void(const char*, const char*)>& visitor) override;
 
  private:
-  FileBackend* runtime_;
-  FileBackend* persistent_;  // may be null
+  FileBackend& runtime_;
+  FileBackend& persistent_;
 };
 
 }  // namespace sysprop::internal

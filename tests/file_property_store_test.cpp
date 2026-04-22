@@ -30,7 +30,7 @@ class FilePropertyStoreTest : public ::testing::Test {
     ps_dir_ = ps;
     rt_backend_.emplace(rt_dir_.c_str());
     ps_backend_.emplace(ps_dir_.c_str());
-    store_.emplace(&*rt_backend_, &*ps_backend_);
+    store_.emplace(*rt_backend_, *ps_backend_);
   }
 
   // Returns true if key exists as a file under dir.
@@ -289,7 +289,7 @@ TEST_F(FilePropertyStoreTest, PersistExistsChecksPeristentBackend) {
 }
 
 TEST_F(FilePropertyStoreTest, NoPersistentBackendStillWorks) {
-  FilePropertyStore no_ps{&*rt_backend_, nullptr};
+  FilePropertyStore no_ps{*rt_backend_, *rt_backend_};
   EXPECT_EQ(SYSPROP_OK, no_ps.Set("persist.wifi.ssid", "Home"));
   EXPECT_TRUE(FileExists(rt_dir_, "persist.wifi.ssid"));
   EXPECT_FALSE(FileExists(ps_dir_, "persist.wifi.ssid"));

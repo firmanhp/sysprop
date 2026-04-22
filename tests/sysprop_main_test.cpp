@@ -37,7 +37,7 @@ class CliTest : public ::testing::Test {
     dir_ = d;
 
     runtime_ = std::make_unique<FileBackend>(dir_.c_str());
-    store_ = std::make_unique<FilePropertyStore>(runtime_.get(), nullptr);
+    store_ = std::make_unique<FilePropertyStore>(*runtime_, *runtime_);
   }
 
   void TearDown() override {

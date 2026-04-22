@@ -31,7 +31,7 @@ class DefaultsLoaderTest : public ::testing::Test {
     ps_dir_ = ps;
     rt_backend_ = std::make_unique<FileBackend>(rt_dir_.c_str());
     ps_backend_ = std::make_unique<FileBackend>(ps_dir_.c_str());
-    store_ = std::make_unique<FilePropertyStore>(rt_backend_.get(), ps_backend_.get());
+    store_ = std::make_unique<FilePropertyStore>(*rt_backend_, *ps_backend_);
   }
 
   // Write content to a uniquely-named temp file and return its path.
