@@ -67,16 +67,22 @@ TEST_F(IntegrationTest, GetNotFoundReturnsError) {
 
 // ── ro.* properties ───────────────────────────────────────────────────────────
 
-TEST_F(IntegrationTest, RoCanBeSetOnce) {
-  EXPECT_EQ(SYSPROP_OK, store_->Set("ro.board.platform", "armv8"));
+TEST_F(IntegrationTest, RoSetReturnsReadOnly) {
+  // Set() must reject ro.* even on the first call; only SetInit() may write them.
+  EXPECT_EQ(SYSPROP_ERR_READ_ONLY, store_->Set("ro.board.platform", "armv8"));
+}
+
+TEST_F(IntegrationTest, RoCanBeWrittenViaSetInit) {
+  EXPECT_EQ(SYSPROP_OK, store_->SetInit("ro.board.platform", "armv8"));
   const int n = store_->Get("ro.board.platform", buf_, sizeof(buf_));
   ASSERT_GE(n, 0);
   EXPECT_STREQ("armv8", buf_);
 }
 
 TEST_F(IntegrationTest, RoCannotBeOverwritten) {
-  ASSERT_EQ(SYSPROP_OK, store_->Set("ro.board.platform", "armv8"));
+  ASSERT_EQ(SYSPROP_OK, store_->SetInit("ro.board.platform", "armv8"));
   EXPECT_EQ(SYSPROP_ERR_READ_ONLY, store_->Set("ro.board.platform", "x86"));
+  EXPECT_EQ(SYSPROP_ERR_READ_ONLY, store_->SetInit("ro.board.platform", "x86"));
 
   // Original value must be unchanged.
   const int n = store_->Get("ro.board.platform", buf_, sizeof(buf_));
@@ -85,7 +91,7 @@ TEST_F(IntegrationTest, RoCannotBeOverwritten) {
 }
 
 TEST_F(IntegrationTest, RoCannotBeDeleted) {
-  ASSERT_EQ(SYSPROP_OK, store_->Set("ro.my.prop", "value"));
+  ASSERT_EQ(SYSPROP_OK, store_->SetInit("ro.my.prop", "value"));
   EXPECT_EQ(SYSPROP_ERR_READ_ONLY, store_->Delete("ro.my.prop"));
 }
 
@@ -219,21 +225,21 @@ TEST_F(IntegrationTest, OverwriteLargeValueWithSmallNoStaleBytes) {
 
 TEST_F(IntegrationTest, RoPrefixTakesPrecedenceOverPersistPrefix) {
   // ro.persist.* is read-only and must NOT be written to the persistent backend.
-  ASSERT_EQ(SYSPROP_OK, store_->Set("ro.persist.cfg", "locked"));
+  ASSERT_EQ(SYSPROP_OK, store_->SetInit("ro.persist.cfg", "locked"));
   EXPECT_EQ(SYSPROP_ERR_READ_ONLY, store_->Set("ro.persist.cfg", "hacked"));
   const std::string ps_path = ps_dir_ + "/ro.persist.cfg";
   EXPECT_NE(0, ::access(ps_path.c_str(), F_OK));
 }
 
 TEST_F(IntegrationTest, TwoStoresOnSameRuntimeDirRoFirstWins) {
-  // Simulate two processes racing to set the same ro.* key.
+  // Simulate two sysprop-init instances racing to set the same ro.* key.
   // Whichever commits first locks it; the other must get READ_ONLY.
   FileBackend shared_rt{rt_dir_.c_str()};
   FileBackend shared_ps{ps_dir_.c_str()};
   FilePropertyStore store2{&shared_rt, &shared_ps};
 
-  ASSERT_EQ(SYSPROP_OK, store_->Set("ro.race.key", "first"));
-  EXPECT_EQ(SYSPROP_ERR_READ_ONLY, store2.Set("ro.race.key", "second"));
+  ASSERT_EQ(SYSPROP_OK, store_->SetInit("ro.race.key", "first"));
+  EXPECT_EQ(SYSPROP_ERR_READ_ONLY, store2.SetInit("ro.race.key", "second"));
 
   const int n = store_->Get("ro.race.key", buf_, sizeof(buf_));
   ASSERT_GE(n, 0);

@@ -185,13 +185,10 @@ TEST_F(CliTest, CmdSetpropSuccessStoresValue) {
   EXPECT_STREQ(buf, "verbose");
 }
 
-// setprop ro.* twice → second returns 1 (read-only)
-TEST_F(CliTest, CmdSetpropRoSecondWriteReturnsOne) {
-  MutableArgv av1{"setprop", "ro.hw.sku", "A"};
-  EXPECT_EQ(sysprop::tools::CmdSetprop(av1.argc(), av1.data(), *store_), 0);
-
-  MutableArgv av2{"setprop", "ro.hw.sku", "B"};
-  EXPECT_EQ(sysprop::tools::CmdSetprop(av2.argc(), av2.data(), *store_), 1);
+// setprop ro.* → always rejected, even the very first call
+TEST_F(CliTest, CmdSetpropRoKeyAlwaysReturnsOne) {
+  MutableArgv av{"setprop", "ro.hw.sku", "A"};
+  EXPECT_EQ(sysprop::tools::CmdSetprop(av.argc(), av.data(), *store_), 1);
 }
 
 // setprop invalid key → returns 1
@@ -238,7 +235,7 @@ TEST_F(CliTest, CmdSetpropEmptyQuotedValueDeletesProperty) {
 
 // setprop ro.* "" → denied (read-only), returns 1
 TEST_F(CliTest, CmdSetpropEmptyValueOnRoKeyReturnsOne) {
-  Set("ro.hw.rev", "1");
+  ASSERT_EQ(SYSPROP_OK, store_->SetInit("ro.hw.rev", "1"));
   MutableArgv av{"setprop", "ro.hw.rev", ""};
   EXPECT_EQ(sysprop::tools::CmdSetprop(av.argc(), av.data(), *store_), 1);
 
@@ -274,7 +271,7 @@ TEST_F(CliTest, CmdDeleteNonexistentKeyReturnsNonzero) {
 
 // delete ro.* key → denied, returns 1
 TEST_F(CliTest, CmdDeleteRoKeyReturnsOne) {
-  Set("ro.product.model", "EVB-1");
+  ASSERT_EQ(SYSPROP_OK, store_->SetInit("ro.product.model", "EVB-1"));
   MutableArgv av{"sysprop", "ro.product.model"};
   EXPECT_EQ(sysprop::tools::CmdDelete(av.argc(), av.data(), *store_), 1);
 

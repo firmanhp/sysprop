@@ -270,7 +270,7 @@ TEST_F(DefaultsLoaderTest, DuplicateRoPropertySecondDefinitionRejected) {
 TEST_F(DefaultsLoaderTest, RoPropertyAlreadySetInStoreIsRejected) {
   // If a ro.* property already exists in the store before loading, the file's
   // definition is rejected and the existing value is preserved.
-  ASSERT_EQ(SYSPROP_OK, store_->Set("ro.hw.sku", "factory"));
+  ASSERT_EQ(SYSPROP_OK, store_->SetInit("ro.hw.sku", "factory"));
   const auto f = WritePropFile("ro.hw.sku=override\n");
   EXPECT_EQ(0, LoadDefaultsFile(f.c_str(), *store_));
   EXPECT_EQ("factory", Get("ro.hw.sku"));

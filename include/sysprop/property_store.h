@@ -20,7 +20,15 @@ class PropertyStore {
   virtual ~PropertyStore() = default;
 
   [[nodiscard]] virtual int Get(const char* key, char* buf, std::size_t buf_len) = 0;
+
+  // Regular write. ro.* keys are always rejected with SYSPROP_ERR_READ_ONLY.
   [[nodiscard]] virtual int Set(const char* key, const char* value) = 0;
+
+  // Privileged write used only by sysprop-init. Allows ro.* keys (write-once:
+  // subsequent calls return SYSPROP_ERR_READ_ONLY). For non-ro.* keys,
+  // behaviour is identical to Set().
+  [[nodiscard]] virtual int SetInit(const char* key, const char* value) = 0;
+
   [[nodiscard]] virtual int Delete(const char* key) = 0;
   [[nodiscard]] virtual int Exists(const char* key) = 0;
 

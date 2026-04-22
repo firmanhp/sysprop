@@ -55,7 +55,7 @@ int LoadDefaultsFile(const char* path, sysprop::internal::PropertyStore& store) 
     const std::string key{line, start, eq_pos - start};
     const std::string value{line, eq_pos + 1};
 
-    if (const int rc = store.Set(key.c_str(), value.c_str()); rc == SYSPROP_OK) {
+    if (const int rc = store.SetInit(key.c_str(), value.c_str()); rc == SYSPROP_OK) {
       ++loaded;
     } else {
       std::cerr << "sysprop-init: " << path << ':' << lineno << ": failed to set '" << key

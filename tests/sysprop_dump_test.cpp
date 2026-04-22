@@ -90,7 +90,7 @@ TEST_F(DumpTest, VolatileKeyAppearsInDump) {
 }
 
 TEST_F(DumpTest, ReadOnlyKeyAppearsInDump) {
-  ASSERT_EQ(SYSPROP_OK, sysprop_set("ro.dump.version", "1.0"));
+  ASSERT_EQ(SYSPROP_OK, store_->SetInit("ro.dump.version", "1.0"));
   const std::string out = sysprop_dump();
   EXPECT_NE(out.find("ro.dump.version=1.0\n"), std::string::npos);
 }
@@ -211,7 +211,7 @@ TEST_F(CmdListTest, MultiplePropertiesSorted) {
 }
 
 TEST_F(CmdListTest, ReadOnlyKeyIncluded) {
-  Set("ro.list.ver", "2.0");
+  ASSERT_EQ(SYSPROP_OK, store_->SetInit("ro.list.ver", "2.0"));
   BeginCapture();
   sysprop::tools::CmdList(*store_);
   const std::string out = EndCapture();

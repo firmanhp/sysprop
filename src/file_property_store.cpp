@@ -45,14 +45,35 @@ int FilePropertyStore::Set(const char* key, const char* value) {
     return err;
   }
 
-  // ro.* properties can be set exactly once.
+  // ro.* properties are always read-only; only SetInit() may write them.
+  if (StartsWith(key, kRoPrefix)) {
+    return SYSPROP_ERR_READ_ONLY;
+  }
+
+  // persist.* properties live entirely in the persistent store.
+  if (persistent_ != nullptr && StartsWith(key, kPersistPrefix)) {
+    return persistent_->Set(key, value);
+  }
+  return runtime_->Set(key, value);
+}
+
+int FilePropertyStore::SetInit(const char* key, const char* value) {
+  if (const int err = ValidateKey(key); err != SYSPROP_OK) {
+    return err;
+  }
+  if (const int err = ValidateValue(value); err != SYSPROP_OK) {
+    return err;
+  }
+
+  // ro.* properties may be written exactly once (by sysprop-init at boot).
   if (StartsWith(key, kRoPrefix)) {
     if (runtime_->Exists(key) == SYSPROP_OK) {
       return SYSPROP_ERR_READ_ONLY;
     }
+    return runtime_->Set(key, value);
   }
 
-  // persist.* properties live entirely in the persistent store.
+  // Non-ro.* keys follow normal Set() routing (persist.* → persistent backend).
   if (persistent_ != nullptr && StartsWith(key, kPersistPrefix)) {
     return persistent_->Set(key, value);
   }

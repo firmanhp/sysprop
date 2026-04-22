@@ -106,13 +106,19 @@ TEST_F(FilePropertyStoreTest, DeleteInvalidKeyReturnsError) {
 
 // ── ro.* attack hardening ──────────────────────────────────────────────────────
 
+TEST_F(FilePropertyStoreTest, RoSetAlwaysReturnsReadOnly) {
+  // Set() must reject ro.* unconditionally — even the very first call.
+  EXPECT_EQ(SYSPROP_ERR_READ_ONLY, store_->Set("ro.hw.id", "abc123"));
+  EXPECT_EQ(SYSPROP_ERR_READ_ONLY, store_->Set("ro.hw.id", "abc123"));
+}
+
 TEST_F(FilePropertyStoreTest, RoOverwriteWithSameValueIsStillRejected) {
-  ASSERT_EQ(SYSPROP_OK, store_->Set("ro.hw.id", "abc123"));
+  ASSERT_EQ(SYSPROP_OK, store_->SetInit("ro.hw.id", "abc123"));
   EXPECT_EQ(SYSPROP_ERR_READ_ONLY, store_->Set("ro.hw.id", "abc123"));
 }
 
 TEST_F(FilePropertyStoreTest, RoRepeatedOverwriteAttemptsAllFail) {
-  ASSERT_EQ(SYSPROP_OK, store_->Set("ro.hw.board", "original"));
+  ASSERT_EQ(SYSPROP_OK, store_->SetInit("ro.hw.board", "original"));
   for (int i = 0; i < 20; ++i) {
     EXPECT_EQ(SYSPROP_ERR_READ_ONLY, store_->Set("ro.hw.board", "hacked"));
   }
@@ -122,7 +128,7 @@ TEST_F(FilePropertyStoreTest, RoRepeatedOverwriteAttemptsAllFail) {
 }
 
 TEST_F(FilePropertyStoreTest, RoDeleteRepeatedlyStillFails) {
-  ASSERT_EQ(SYSPROP_OK, store_->Set("ro.sealed", "yes"));
+  ASSERT_EQ(SYSPROP_OK, store_->SetInit("ro.sealed", "yes"));
   for (int i = 0; i < 5; ++i) {
     EXPECT_EQ(SYSPROP_ERR_READ_ONLY, store_->Delete("ro.sealed"));
   }
@@ -130,11 +136,20 @@ TEST_F(FilePropertyStoreTest, RoDeleteRepeatedlyStillFails) {
 }
 
 TEST_F(FilePropertyStoreTest, RoEmptyValueIsImmutable) {
-  ASSERT_EQ(SYSPROP_OK, store_->Set("ro.empty.prop", ""));
+  ASSERT_EQ(SYSPROP_OK, store_->SetInit("ro.empty.prop", ""));
   EXPECT_EQ(SYSPROP_ERR_READ_ONLY, store_->Set("ro.empty.prop", "now-non-empty"));
   const int n = store_->Get("ro.empty.prop", buf_, sizeof(buf_));
   ASSERT_GE(n, 0);
   EXPECT_STREQ("", buf_);
+}
+
+TEST_F(FilePropertyStoreTest, SetInitRoWriteOnceThenRejected) {
+  ASSERT_EQ(SYSPROP_OK, store_->SetInit("ro.boot.id", "first"));
+  EXPECT_EQ(SYSPROP_ERR_READ_ONLY, store_->SetInit("ro.boot.id", "second"));
+
+  const int n = store_->Get("ro.boot.id", buf_, sizeof(buf_));
+  ASSERT_GE(n, 0);
+  EXPECT_STREQ("first", buf_);
 }
 
 // ── Prefix-boundary corner cases ─────────────────────────────────────────────
@@ -154,7 +169,7 @@ TEST_F(FilePropertyStoreTest, BarePeristKeyWithoutDotIsNotPersisted) {
 }
 
 TEST_F(FilePropertyStoreTest, RoPersistKeyIsReadOnlyAndNotPersisted) {
-  ASSERT_EQ(SYSPROP_OK, store_->Set("ro.persist.cfg", "locked"));
+  ASSERT_EQ(SYSPROP_OK, store_->SetInit("ro.persist.cfg", "locked"));
   EXPECT_EQ(SYSPROP_ERR_READ_ONLY, store_->Set("ro.persist.cfg", "hacked"));
   EXPECT_FALSE(FileExists(ps_dir_, "ro.persist.cfg"));
 }
@@ -191,16 +206,16 @@ TEST_F(FilePropertyStoreTest, PersistDeleteAndRecreateUpdatesBackend) {
   EXPECT_TRUE(FileExists(ps_dir_, "persist.cfg"));
 }
 
-TEST_F(FilePropertyStoreTest, RoPropertySetOnce) {
-  EXPECT_EQ(SYSPROP_OK, store_->Set("ro.build.version", "42"));
+TEST_F(FilePropertyStoreTest, RoPropertySetInitOnce) {
+  EXPECT_EQ(SYSPROP_OK, store_->SetInit("ro.build.version", "42"));
   const int n = store_->Get("ro.build.version", buf_, sizeof(buf_));
   ASSERT_GE(n, 0);
   EXPECT_STREQ("42", buf_);
 }
 
-TEST_F(FilePropertyStoreTest, RoPropertySetTwiceReturnsReadOnly) {
-  ASSERT_EQ(SYSPROP_OK, store_->Set("ro.build.version", "42"));
-  EXPECT_EQ(SYSPROP_ERR_READ_ONLY, store_->Set("ro.build.version", "99"));
+TEST_F(FilePropertyStoreTest, RoPropertySetInitTwiceReturnsReadOnly) {
+  ASSERT_EQ(SYSPROP_OK, store_->SetInit("ro.build.version", "42"));
+  EXPECT_EQ(SYSPROP_ERR_READ_ONLY, store_->SetInit("ro.build.version", "99"));
 
   const int n = store_->Get("ro.build.version", buf_, sizeof(buf_));
   ASSERT_GE(n, 0);
@@ -208,7 +223,7 @@ TEST_F(FilePropertyStoreTest, RoPropertySetTwiceReturnsReadOnly) {
 }
 
 TEST_F(FilePropertyStoreTest, DeleteRoPropertyReturnsReadOnly) {
-  ASSERT_EQ(SYSPROP_OK, store_->Set("ro.my.prop", "value"));
+  ASSERT_EQ(SYSPROP_OK, store_->SetInit("ro.my.prop", "value"));
   EXPECT_EQ(SYSPROP_ERR_READ_ONLY, store_->Delete("ro.my.prop"));
   EXPECT_TRUE(FileExists(rt_dir_, "ro.my.prop"));
 }

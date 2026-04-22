@@ -52,6 +52,11 @@ class MockPropertyStore final : public sysprop::internal::PropertyStore {
     return SYSPROP_OK;
   }
 
+  int SetInit(const char* key, const char* value) override {
+    map_[key] = value;
+    return SYSPROP_OK;
+  }
+
   int Delete(const char* key) override {
     const auto it = map_.find(key);
     if (it == map_.end()) { return SYSPROP_ERR_NOT_FOUND; }
