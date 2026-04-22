@@ -48,7 +48,13 @@
 # -llvm-header-guard:
 #   The codebase uses #pragma once throughout; the llvm-header-guard check
 #   enforces #ifndef-style guards which would be inconsistent and more fragile.
-
+#
+# -cppcoreguidelines-avoid-non-const-global-variables:
+#   The global singleton (GlobalStore) is intentionally a non-const global,
+#   constructed via placement-new before main() via __attribute__((constructor)).
+#   This is load-bearing design; there is no alternative without heap or
+#   explicit init calls.
+#
 Checks: >-
   *,
   -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
@@ -70,6 +76,7 @@ Checks: >-
   -linuxkernel-*,
   -abseil-*,
   -llvm-header-guard,
+  -cppcoreguidelines-avoid-non-const-global-variables,
 
 # Treat warnings as errors in CI — remove WarningsAsErrors to allow
 # advisory-only runs during development.
@@ -82,3 +89,5 @@ HeaderFilterRegex: '.*/sysprop/(src|include/sysprop/(property_store\.h|testing/.
 CheckOptions:
   - key: bugprone-easily-swappable-parameters.MinimumLength
     value: '3'
+  - key: misc-non-private-member-variables-in-classes.IgnoreClassesWithAllMemberVariablesBeingPublic
+    value: 'true'

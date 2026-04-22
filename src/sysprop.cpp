@@ -43,19 +43,17 @@ struct GlobalStore {
 #endif
   }
 
-  FileBackend runtime_;  // NOLINT(misc-non-private-member-variables-in-classes) -- GlobalStore is
-                         // an internal impl struct, not a public API class
-  std::optional<FileBackend> persistent_;   // NOLINT(misc-non-private-member-variables-in-classes)
-  FilePropertyStore store_;                 // NOLINT(misc-non-private-member-variables-in-classes)
+  FileBackend runtime_;
+  std::optional<FileBackend> persistent_;
+  FilePropertyStore store_;
 };
 
 // Raw storage avoids any static-initializer or atexit registration.
 // Placement-new'd by sysprop_auto_init(); never explicitly destructed (lifetime
 // matches the process — the OS reclaims on exit).
-alignas(GlobalStore) unsigned char s_storage[sizeof(  // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
-    GlobalStore)];
-GlobalStore* s_instance = nullptr;             // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
-PropertyStore* s_store_override = nullptr;     // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
+alignas(GlobalStore) unsigned char s_storage[sizeof(GlobalStore)];
+GlobalStore* s_instance = nullptr;
+PropertyStore* s_store_override = nullptr;
 
 PropertyStore* GetStore() {
   if (s_store_override != nullptr) { return s_store_override; }
